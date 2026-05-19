@@ -29,6 +29,8 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+from openpyxl.chart import BarChart, LineChart, PieChart, Reference
+from openpyxl.chart.series import DataPoint
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
@@ -382,6 +384,213 @@ def _sanitize_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+# ---------------------------------------------------------------------------
+# 4b. Gráficos no XLSX
+# ---------------------------------------------------------------------------
+
+# Cores das series (hex sem #) — mesmas do dashboard Streamlit
+_C_FECHADO   = "2CA02C"
+_C_PROCESSO  = "FF7F0E"
+_C_ABERTO    = "1F77B4"
+_C_ALERTA    = "D62728"
+_C_PRINCIPAL = "1F3864"
+
+
+def _set_color(series, fill_hex: str) -> None:
+    try:
+        series.graphicalProperties.solidFill = fill_hex
+        series.graphicalProperties.line.solidFill = fill_hex
+    except Exception:
+        pass
+
+
+def _col(df: pd.DataFrame, name: str) -> int:
+    return df.columns.get_loc(name) + 1
+
+
+def _chart_funil(ws, df: pd.DataFrame) -> None:
+    """Barras agrupadas (abertos/fechados/em_processo) + linha de SLA por periodo."""
+    n = len(df) + 1
+    cats = Reference(ws, min_col=_col(df, "periodo"), min_row=2, max_row=n)
+    chart_row = n + 3
+
+    # Grouped column bar
+    bar = BarChart()
+    bar.type = "col"
+    bar.grouping = "clustered"
+    bar.title = "Funil de Tickets"
+    bar.y_axis.title = "Quantidade"
+    bar.width = 22
+    bar.height = 14
+
+    for col_name, color in [
+        ("tickets_abertos",  _C_ABERTO),
+        ("tickets_fechados", _C_FECHADO),
+        ("em_processo",      _C_PROCESSO),
+    ]:
+        ref = Reference(ws, min_col=_col(df, col_name), max_col=_col(df, col_name),
+                        min_row=1, max_row=n)
+        bar.add_data(ref, titles_from_data=True)
+        _set_color(bar.series[-1], color)
+
+    bar.set_categories(cats)
+    ws.add_chart(bar, f"A{chart_row}")
+
+    # Line: tempo medio resposta
+    line = LineChart()
+    line.title = "Tempo Medio de Resposta (h)"
+    line.y_axis.title = "Horas"
+    line.width = 18
+    line.height = 12
+
+    ref_resp = Reference(ws, min_col=_col(df, "tempo_medio_resposta_h"),
+                         max_col=_col(df, "tempo_medio_resposta_h"),
+                         min_row=1, max_row=n)
+    line.add_data(ref_resp, titles_from_data=True)
+    line.set_categories(cats)
+    try:
+        line.series[0].graphicalProperties.line.solidFill = _C_PRINCIPAL
+        line.series[0].graphicalProperties.line.width = 25000
+        line.series[0].marker.symbol = "circle"
+        line.series[0].marker.size = 6
+    except Exception:
+        pass
+
+    ws.add_chart(line, f"{get_column_letter(len(df.columns) + 2)}{chart_row}")
+
+
+def _chart_por_assunto(ws, df: pd.DataFrame) -> None:
+    """Bar horizontal: top 20 assuntos por volume com % fechado."""
+    n_plot = min(20, len(df))
+    n = n_plot + 1
+    chart_row = len(df) + 4
+
+    bar = BarChart()
+    bar.type = "bar"
+    bar.grouping = "clustered"
+    bar.title = "Top 20 Assuntos por Volume"
+    bar.x_axis.title = "Quantidade"
+    bar.width = 26
+    bar.height = 16
+
+    for col_name, color in [
+        ("total",    _C_PRINCIPAL),
+        ("fechados", _C_FECHADO),
+        ("em_processo", _C_PROCESSO),
+    ]:
+        ref = Reference(ws, min_col=_col(df, col_name), max_col=_col(df, col_name),
+                        min_row=1, max_row=n)
+        bar.add_data(ref, titles_from_data=True)
+        _set_color(bar.series[-1], color)
+
+    cats = Reference(ws, min_col=_col(df, "assunto"), min_row=2, max_row=n)
+    bar.set_categories(cats)
+    ws.add_chart(bar, f"A{chart_row}")
+
+
+def _chart_por_escritorio(ws, df: pd.DataFrame) -> None:
+    """Barras: fechados vs pendentes + barra de tempo medio de resposta."""
+    n_plot = min(20, len(df))
+    n = n_plot + 1
+    chart_row = len(df) + 4
+
+    cats = Reference(ws, min_col=_col(df, "escritorio"), min_row=2, max_row=n)
+
+    # Fechados vs pendentes
+    bar = BarChart()
+    bar.type = "bar"
+    bar.grouping = "clustered"
+    bar.title = "Fechados vs Pendentes — Top 20 Escritorios"
+    bar.x_axis.title = "Quantidade"
+    bar.width = 24
+    bar.height = 16
+
+    for col_name, color in [
+        ("fechados",  _C_FECHADO),
+        ("pendentes", _C_ALERTA),
+    ]:
+        ref = Reference(ws, min_col=_col(df, col_name), max_col=_col(df, col_name),
+                        min_row=1, max_row=n)
+        bar.add_data(ref, titles_from_data=True)
+        _set_color(bar.series[-1], color)
+
+    bar.set_categories(cats)
+    ws.add_chart(bar, f"A{chart_row}")
+
+    # Tempo medio resposta
+    bar2 = BarChart()
+    bar2.type = "bar"
+    bar2.title = "Tempo Medio de Resposta (h) — Top 20 Escritorios"
+    bar2.x_axis.title = "Horas"
+    bar2.width = 22
+    bar2.height = 14
+
+    ref_resp = Reference(ws, min_col=_col(df, "tempo_medio_resposta_h"),
+                         max_col=_col(df, "tempo_medio_resposta_h"),
+                         min_row=1, max_row=n)
+    bar2.add_data(ref_resp, titles_from_data=True)
+    bar2.set_categories(cats)
+    _set_color(bar2.series[0], _C_PROCESSO)
+
+    ws.add_chart(bar2, f"{get_column_letter(len(df.columns) + 2)}{chart_row}")
+
+
+def _chart_aba_geral(ws, df: pd.DataFrame) -> None:
+    """Pie chart de status a partir de mini tabela adicionada abaixo dos dados."""
+    n_data = len(df) + 1
+    summary_row = n_data + 3
+
+    # Escreve mini tabela de contagem
+    status_counts = df["status"].value_counts()
+    ws.cell(row=summary_row, column=1, value="Status")
+    ws.cell(row=summary_row, column=2, value="Total")
+    for i, (status, count) in enumerate(status_counts.items(), start=1):
+        ws.cell(row=summary_row + i, column=1, value=str(status))
+        ws.cell(row=summary_row + i, column=2, value=int(count))
+
+    n_s = len(status_counts)
+
+    # Pie chart
+    pie = PieChart()
+    pie.title = "Distribuicao por Status"
+    pie.width = 16
+    pie.height = 14
+
+    labels = Reference(ws, min_col=1, min_row=summary_row + 1, max_row=summary_row + n_s)
+    data   = Reference(ws, min_col=2, min_row=summary_row,     max_row=summary_row + n_s)
+    pie.add_data(data, titles_from_data=True)
+    pie.set_categories(labels)
+
+    colors_status = [_C_FECHADO, _C_PROCESSO, _C_ABERTO, _C_ALERTA]
+    for i, color in enumerate(colors_status[:n_s]):
+        pt = DataPoint(idx=i)
+        try:
+            pt.graphicalProperties.solidFill = color
+        except Exception:
+            pass
+        pie.series[0].dPt.append(pt)
+
+    ws.add_chart(pie, f"D{summary_row}")
+
+
+def _add_charts_to_workbook(writer, sheets: dict[str, pd.DataFrame]) -> None:
+    """Adiciona gráficos em cada aba após a escrita dos dados."""
+    handlers = {
+        "Funil_Mensal":    _chart_funil,
+        "Funil_Semanal":   _chart_funil,
+        "Por_Assunto":     _chart_por_assunto,
+        "Por_Escritorio":  _chart_por_escritorio,
+        "Aba_Geral":       _chart_aba_geral,
+    }
+    for sheet_name, fn in handlers.items():
+        if sheet_name not in sheets or len(sheets[sheet_name]) == 0:
+            continue
+        try:
+            fn(writer.sheets[sheet_name], sheets[sheet_name])
+        except Exception as e:
+            print(f"  [aviso] grafico '{sheet_name}' nao gerado: {e}")
+
+
 def write_xlsx(path: str, sheets: dict[str, pd.DataFrame]) -> None:
     with pd.ExcelWriter(path, engine="openpyxl", datetime_format="DD/MM/YYYY HH:MM") as writer:
         for sheet_name, df in sheets.items():
@@ -391,12 +600,12 @@ def write_xlsx(path: str, sheets: dict[str, pd.DataFrame]) -> None:
             _apply_header(ws)
             _autowidth(ws, df)
             ws.freeze_panes = "A2"
-
             if "status" in df.columns:
                 _color_status_rows(ws, df, "status")
-
             if sheet_name in HIDDEN_SHEETS:
                 ws.sheet_state = "hidden"
+
+        _add_charts_to_workbook(writer, sheets)
 
     print(f"  XLSX salvo: {Path(path).name}")
 
