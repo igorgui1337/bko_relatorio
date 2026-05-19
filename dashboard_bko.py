@@ -181,6 +181,275 @@ def executar_pipeline(file_bytes: bytes, file_ext: str, status_ui) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Exportação: PDF e E-mail
+# ---------------------------------------------------------------------------
+
+def _trunc(s: str, n: int) -> str:
+    """Trunca string para n chars (latin-1 safe) e adiciona '...' se necessário."""
+    s = str(s).encode("latin-1", errors="replace").decode("latin-1")
+    return s[: n - 3] + "..." if len(s) > n else s
+
+
+def _pdf_section(pdf, title: str) -> None:
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_text_color(31, 56, 100)
+    pdf.cell(0, 8, text=title, new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(1)
+
+
+def _pdf_table_header(pdf, headers: list, widths: list) -> None:
+    pdf.set_fill_color(31, 56, 100)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 9)
+    for h, w in zip(headers, widths):
+        pdf.cell(w, 7, text=h, border=1, fill=True, align="C",
+                 new_x="RIGHT", new_y="TOP")
+    pdf.ln(7)
+
+
+def _pdf_table_row(pdf, values: list, widths: list, idx: int) -> None:
+    if idx % 2 == 0:
+        pdf.set_fill_color(240, 245, 255)
+    else:
+        pdf.set_fill_color(255, 255, 255)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Helvetica", "", 8)
+    for val, w in zip(values, widths):
+        pdf.cell(w, 6, text=_trunc(str(val), 40), border=1, fill=True, align="C",
+                 new_x="RIGHT", new_y="TOP")
+    pdf.ln(6)
+
+
+def _pdf_add_charts(pdf, result: dict) -> None:
+    """Adiciona graficos PNG ao PDF. Silencioso se kaleido nao estiver disponivel."""
+    try:
+        import plotly.io as pio
+
+        df_m = result["funil_m"]
+        fig1 = px.bar(
+            df_m, x="periodo",
+            y=["tickets_abertos", "tickets_fechados", "em_processo"],
+            barmode="group",
+            title="Funil Mensal de Tickets",
+            color_discrete_map={
+                "tickets_abertos":  "#1F77B4",
+                "tickets_fechados": "#2CA02C",
+                "em_processo":      "#FF7F0E",
+            },
+        )
+        fig1.update_layout(height=350, width=720, margin=dict(t=40, b=30),
+                           legend_title_text="", plot_bgcolor="white",
+                           paper_bgcolor="white")
+
+        df_e = result["escrit"].sort_values("total_tickets", ascending=True).tail(15)
+        fig2 = px.bar(
+            df_e, x="total_tickets", y="escritorio", orientation="h",
+            title="Volume por Escritorio (Top 15)",
+            color_discrete_sequence=["#1F3864"],
+        )
+        fig2.update_layout(height=420, width=720, margin=dict(t=40, b=30),
+                           plot_bgcolor="white", paper_bgcolor="white")
+
+        charts = [
+            ("Funil Mensal", fig1),
+            ("Escritorios — Volume de Tickets", fig2),
+        ]
+
+        pdf.add_page()
+        _pdf_section(pdf, "Graficos")
+
+        for title_fig, fig in charts:
+            img_bytes = pio.to_image(fig, format="png", scale=1.5)
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+                tmp.write(img_bytes)
+                tmp_path = tmp.name
+            try:
+                pdf.set_font("Helvetica", "I", 9)
+                pdf.set_text_color(80, 80, 80)
+                pdf.cell(0, 6, text=title_fig, new_x="LMARGIN", new_y="NEXT")
+                pdf.image(tmp_path, w=180)
+                pdf.ln(6)
+            finally:
+                Path(tmp_path).unlink(missing_ok=True)
+
+    except Exception as exc:
+        _log(f"Graficos no PDF ignorados: {exc}")
+
+
+def _build_pdf(result: dict) -> bytes:
+    """Gera PDF com KPIs, tabelas resumo e graficos (se kaleido disponivel)."""
+    from fpdf import FPDF
+
+    df_g  = result["geral"]
+    ref   = result["ref_time"]
+    total = len(df_g)
+    fech  = int((df_g["status"] == "closed").sum())
+    proc  = int(df_g["status"].isin(["open", "processing"]).sum())
+    alert = int((df_g["sla_alerta"] == "SIM").sum())
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_margins(15, 15, 15)
+    pdf.add_page()
+
+    # Titulo
+    pdf.set_font("Helvetica", "B", 20)
+    pdf.set_text_color(31, 56, 100)
+    pdf.cell(0, 12, text="Relatorio BKO - Tickets", align="C",
+             new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(100, 100, 100)
+    pdf.cell(0, 6, text=f"Gerado em: {ref}", align="C",
+             new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(5)
+    pdf.set_draw_color(31, 56, 100)
+    pdf.line(15, pdf.get_y(), 195, pdf.get_y())
+    pdf.ln(6)
+
+    # KPIs
+    cw = (pdf.w - 30) / 4
+    kpis = [
+        ("Total de Tickets", str(total),                         "1F3864"),
+        ("Fechados",         f"{fech} ({fech/total*100:.1f}%)",  "2CA02C"),
+        ("Em Processo",      str(proc),                          "FF7F0E"),
+        ("SLA Alerta >24h",  str(alert),                         "D62728"),
+    ]
+    for _, value, color in kpis:
+        r, g, b = int(color[0:2], 16), int(color[2:4], 16), int(color[4:6], 16)
+        pdf.set_fill_color(r, g, b)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Helvetica", "B", 16)
+        pdf.cell(cw, 14, text=value, border=1, fill=True, align="C",
+                 new_x="RIGHT", new_y="TOP")
+    pdf.ln(14)
+    for label, _, _ in kpis:
+        pdf.set_text_color(80, 80, 80)
+        pdf.set_font("Helvetica", "", 8)
+        pdf.cell(cw, 6, text=label, align="C", new_x="RIGHT", new_y="TOP")
+    pdf.ln(12)
+
+    # Funil Mensal
+    _pdf_section(pdf, "Funil Mensal")
+    heads_f = ["Periodo", "Abertos", "Fechados", "Em Processo", "% Fechado", "Resp. Med (h)"]
+    wids_f  = [35, 25, 25, 32, 28, 35]
+    cols_f  = ["periodo", "tickets_abertos", "tickets_fechados",
+               "em_processo", "pct_fechado", "tempo_medio_resposta_h"]
+    _pdf_table_header(pdf, heads_f, wids_f)
+    for i, (_, row) in enumerate(result["funil_m"][cols_f].tail(12).iterrows()):
+        resp = f"{row['tempo_medio_resposta_h']:.1f}" if pd.notna(row["tempo_medio_resposta_h"]) else "-"
+        _pdf_table_row(pdf, [
+            row["periodo"],
+            int(row["tickets_abertos"]),
+            int(row["tickets_fechados"]),
+            int(row["em_processo"]),
+            f"{row['pct_fechado']:.1f}%",
+            resp,
+        ], wids_f, i)
+
+    # Pagina 2: Assuntos + Escritorios
+    pdf.add_page()
+
+    _pdf_section(pdf, "Top 10 Assuntos por Volume")
+    heads_a = ["Assunto", "Total", "Fechados", "Em Processo", "% Fechado"]
+    wids_a  = [78, 22, 28, 32, 20]
+    _pdf_table_header(pdf, heads_a, wids_a)
+    for i, (_, row) in enumerate(result["assunto"].head(10).iterrows()):
+        _pdf_table_row(pdf, [
+            _trunc(row["assunto"], 40),
+            int(row["total"]),
+            int(row["fechados"]),
+            int(row["em_processo"]),
+            f"{row['pct_fechado']:.1f}%",
+        ], wids_a, i)
+
+    pdf.ln(8)
+
+    _pdf_section(pdf, "Top 10 Escritorios")
+    heads_e = ["Escritorio", "Total", "Fechados", "Pendentes", "% Fechado", "Resp. Med (h)"]
+    wids_e  = [52, 20, 25, 28, 25, 30]
+    _pdf_table_header(pdf, heads_e, wids_e)
+    for i, (_, row) in enumerate(result["escrit"].head(10).iterrows()):
+        resp = f"{row['tempo_medio_resposta_h']:.1f}" if pd.notna(row.get("tempo_medio_resposta_h")) else "-"
+        _pdf_table_row(pdf, [
+            _trunc(row["escritorio"], 28),
+            int(row["total_tickets"]),
+            int(row["fechados"]),
+            int(row["pendentes"]),
+            f"{row['pct_fechado']:.1f}%",
+            resp,
+        ], wids_e, i)
+
+    # Pagina 3: Graficos (opcional — precisa de kaleido)
+    _pdf_add_charts(pdf, result)
+
+    return bytes(pdf.output())
+
+
+def _enviar_email(destinatario: str, xlsx_bytes: bytes, ref_time: str) -> None:
+    """Envia XLSX por e-mail usando credenciais configuradas nos Streamlit Secrets."""
+    import smtplib
+    from email import encoders as enc_mod
+    from email.mime.base import MIMEBase
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    cfg       = st.secrets.get("email", {})
+    smtp_host = cfg.get("smtp_host", "smtp.gmail.com")
+    smtp_port = int(cfg.get("smtp_port", 587))
+    smtp_user = cfg.get("smtp_user", "")
+    smtp_pass = cfg.get("smtp_password", "")
+    smtp_from = cfg.get("smtp_from", smtp_user)
+
+    if not smtp_user or not smtp_pass:
+        raise ValueError(
+            "Credenciais SMTP nao configuradas.\n"
+            "Adicione no Streamlit Secrets (Settings > Secrets):\n\n"
+            "[email]\n"
+            "smtp_host     = \"smtp.gmail.com\"\n"
+            "smtp_port     = 587\n"
+            "smtp_user     = \"seu@email.com\"\n"
+            "smtp_password = \"sua_senha_de_app\"\n"
+            "smtp_from     = \"seu@email.com\""
+        )
+
+    msg            = MIMEMultipart()
+    msg["From"]    = smtp_from
+    msg["To"]      = destinatario
+    msg["Subject"] = f"Relatorio BKO - Tickets ({ref_time})"
+
+    body = (
+        f"Ola,\n\n"
+        f"Segue em anexo o relatorio de tickets BKO gerado em {ref_time}.\n\n"
+        "O arquivo XLSX contem:\n"
+        "  - Aba Geral: todos os tickets consolidados\n"
+        "  - SLA Em Processo: tickets ativos por tempo em aberto\n"
+        "  - SLA Resposta: tempo de resposta BO > BP\n"
+        "  - Funil Mensal e Semanal\n"
+        "  - Por Assunto e Por Escritorio\n\n"
+        "Atenciosamente,\n"
+        "Dashboard BKO"
+    )
+    msg.attach(MIMEText(body, "plain", "utf-8"))
+
+    safe_ref = ref_time.replace("/", "").replace(":", "").replace(" ", "_")
+    fname    = f"relatorio_bko_{safe_ref}.xlsx"
+    part     = MIMEBase("application",
+                        "vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    part.set_payload(xlsx_bytes)
+    enc_mod.encode_base64(part)
+    part.add_header("Content-Disposition", "attachment", filename=fname)
+    msg.attach(part)
+
+    with smtplib.SMTP(smtp_host, smtp_port) as server:
+        server.ehlo()
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
+        server.send_message(msg)
+
+    _log(f"Email enviado para {destinatario}")
+
+
+# ---------------------------------------------------------------------------
 # Componentes visuais
 # ---------------------------------------------------------------------------
 
@@ -654,15 +923,56 @@ def main():
             for av in result["avisos"]:
                 st.warning(av)
 
-    # Download na sidebar
+    # Downloads e e-mail na sidebar
     with st.sidebar:
+        st.markdown("#### 📥 Exportar")
+
         st.download_button(
-            label="📥 Baixar XLSX completo",
+            label="📊 Baixar XLSX completo",
             data=result["xlsx"],
             file_name=f"relatorio_bko_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
         )
+
+        # PDF — gerado uma vez por arquivo e cacheado na session_state
+        pdf_key = f"pdf_{uploaded.file_id}"
+        if pdf_key not in st.session_state:
+            with st.spinner("Gerando PDF..."):
+                try:
+                    st.session_state[pdf_key] = _build_pdf(result)
+                except Exception as e_pdf:
+                    _log(f"Erro ao gerar PDF: {e_pdf}")
+                    st.session_state[pdf_key] = None
+
+        if st.session_state[pdf_key]:
+            st.download_button(
+                label="📄 Baixar PDF",
+                data=st.session_state[pdf_key],
+                file_name=f"relatorio_bko_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                mime="application/pdf",
+                use_container_width=True,
+            )
+        else:
+            st.warning("PDF nao disponivel (erro na geracao).")
+
+        st.markdown("---")
+        st.markdown("#### 📧 Enviar por E-mail")
+        dest = st.text_input(
+            "Destinatario",
+            placeholder="email@exemplo.com",
+            key="email_dest",
+        )
+        if st.button("Enviar Relatorio", use_container_width=True, key="btn_email"):
+            if not dest or "@" not in dest:
+                st.warning("Informe um e-mail valido.")
+            else:
+                with st.spinner(f"Enviando para {dest}..."):
+                    try:
+                        _enviar_email(dest, result["xlsx"], result["ref_time"])
+                        st.success(f"E-mail enviado para **{dest}**!")
+                    except Exception as e_mail:
+                        st.error(str(e_mail))
 
     # Big numbers
     st.markdown("---")

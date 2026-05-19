@@ -14,6 +14,9 @@ bko_env/
 venv/
 .venv/
 
+# Streamlit secrets — nunca versionar
+.streamlit/secrets.toml
+
 # OS
 .DS_Store
 Thumbs.db
