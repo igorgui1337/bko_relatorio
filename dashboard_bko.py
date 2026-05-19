@@ -8,6 +8,7 @@ Uso: streamlit run dashboard_bko.py
      (ou via rodar_dashboard.bat)
 """
 
+import os
 import sys
 import tempfile
 import traceback
@@ -17,6 +18,9 @@ from pathlib import Path
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+from dotenv import load_dotenv
+
+load_dotenv()  # carrega .env em desenvolvimento local (no-op no Streamlit Cloud)
 
 sys.path.insert(0, str(Path(__file__).parent))
 import validador_tabela_ticket as vtk
@@ -393,12 +397,13 @@ def _enviar_email(destinatario: str, xlsx_bytes: bytes, ref_time: str) -> None:
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
 
+    # Prioridade: Streamlit Secrets (Cloud) → variáveis de ambiente do .env (local)
     cfg       = st.secrets.get("email", {})
-    smtp_host = cfg.get("smtp_host", "smtp.gmail.com")
-    smtp_port = int(cfg.get("smtp_port", 587))
-    smtp_user = cfg.get("smtp_user", "")
-    smtp_pass = cfg.get("smtp_password", "")
-    smtp_from = cfg.get("smtp_from", smtp_user)
+    smtp_host = cfg.get("smtp_host") or os.getenv("EMAIL_SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(cfg.get("smtp_port") or os.getenv("EMAIL_SMTP_PORT", "587"))
+    smtp_user = cfg.get("smtp_user") or os.getenv("EMAIL_SMTP_USER", "")
+    smtp_pass = cfg.get("smtp_password") or os.getenv("EMAIL_SMTP_PASSWORD", "")
+    smtp_from = cfg.get("smtp_from") or os.getenv("EMAIL_SMTP_FROM", smtp_user)
 
     if not smtp_user or not smtp_pass:
         raise ValueError(
