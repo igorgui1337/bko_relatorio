@@ -345,20 +345,28 @@ def _autowidth(ws, df: pd.DataFrame) -> None:
         ws.column_dimensions[letter].width = min(max_len + 4, 55)
 
 
+_COLOR_LIMIT = 500  # aplica coloracao apenas em sheets com ate N linhas
+
+
 def _color_status_rows(ws, df: pd.DataFrame, status_col: str) -> None:
-    """Pinta cada linha conforme o status do ticket."""
-    if status_col not in df.columns:
+    """
+    Pinta cada linha conforme o status do ticket.
+    Ignorado para sheets grandes (> _COLOR_LIMIT linhas) por performance.
+    """
+    if status_col not in df.columns or len(df) > _COLOR_LIMIT:
         return
+
     alert_col_idx = df.columns.get_loc("sla_alerta") + 1 if "sla_alerta" in df.columns else None
 
-    for row_idx, (_, row) in enumerate(df.iterrows(), start=2):
-        status_val = str(row.get(status_col, "")).lower()
-        is_alert   = str(row.get("sla_alerta", "")) == "SIM"
+    status_vals = df[status_col].str.lower().tolist()
+    alert_vals  = (df["sla_alerta"] == "SIM").tolist() if "sla_alerta" in df.columns else [False] * len(df)
 
-        fill = _STATUS_FILL.get(status_val)
+    for i, (status_val, is_alert) in enumerate(zip(status_vals, alert_vals), start=2):
+        fill       = _STATUS_FILL.get(status_val)
         alert_fill = _ALERT_FILL if is_alert else None
-
-        for cell in ws[row_idx]:
+        if not fill and not alert_fill:
+            continue
+        for cell in ws[i]:
             if alert_fill and cell.column == alert_col_idx:
                 cell.fill = alert_fill
             elif fill:

@@ -52,18 +52,26 @@ COR_PRINCIPAL = "#1F3864"
 
 
 # ---------------------------------------------------------------------------
-# Pipeline (cacheado por conteudo do arquivo)
+# Pipeline com logs detalhados
 # ---------------------------------------------------------------------------
 
-@st.cache_data(show_spinner=False)
-def executar_pipeline(file_bytes: bytes) -> dict:
+def _log(msg: str):
+    """Loga no terminal (visivel no Streamlit Cloud logs) com timestamp."""
+    print(f"[BKO {datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
+
+
+def executar_pipeline(file_bytes: bytes, status_ui) -> dict:
     """
-    ETL completo em memoria.
-    Retorna todos os DataFrames e o XLSX em bytes para download.
+    ETL completo em memoria com logs em cada etapa.
+    status_ui: contexto st.status() para atualizacao visual em tempo real.
     """
     prd.AGORA = datetime.now()
 
-    # 1. Salva em temp para o validador (que aceita path)
+    # ── Etapa 1: leitura e ETL ──────────────────────────────────────────
+    status_ui.update(label="[1/6] Lendo arquivo e corrigindo encoding...")
+    _log("INICIO pipeline")
+    _log(f"Arquivo: {len(file_bytes):,} bytes")
+
     with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
         tmp.write(file_bytes)
         tmp_path = Path(tmp.name)
@@ -73,33 +81,58 @@ def executar_pipeline(file_bytes: bytes) -> dict:
     finally:
         tmp_path.unlink(missing_ok=True)
 
-    # Limpa espacos
+    _log(f"Leitura OK | encoding={enc} | linhas={len(df_raw):,} | colunas={len(df_raw.columns)}")
+
+    # ── Etapa 2: limpeza ────────────────────────────────────────────────
+    status_ui.update(label="[2/6] Limpando caracteres especiais...")
+    _log("Iniciando limpeza de strings...")
+
     str_cols = df_raw.select_dtypes(include=["object", "str"]).columns
     df_raw[str_cols] = df_raw[str_cols].apply(lambda s: s.str.strip())
 
-    # Corrige encoding coluna B
     if "ticket_subject" in df_raw.columns:
         df_raw["ticket_subject"] = vtk._fix_residual_chars(df_raw["ticket_subject"])
 
-    # Separa datetime se necessario
     df_raw, cols_criadas = vtk.split_datetime_columns(df_raw)
-
-    # Validacao
     avisos = vtk.validate(df_raw)
+    _log(f"Limpeza OK | cols_criadas={cols_criadas} | avisos={len(avisos)}")
 
-    # 2. Parse datetimes + consolidar
-    df_raw   = prd._parse_datetimes(df_raw)
+    # ── Etapa 3: parse de datetimes ─────────────────────────────────────
+    status_ui.update(label="[3/6] Convertendo colunas de data e hora...")
+    _log("Parse de datetimes...")
+
+    df_raw = prd._parse_datetimes(df_raw)
+    _log("Parse OK")
+
+    # ── Etapa 4: consolidacao por ticket ────────────────────────────────
+    status_ui.update(label="[4/6] Consolidando tickets (pode demorar)...")
+    _log("Consolidando tickets por ticket_id...")
+
     df_geral = prd.consolidate(df_raw)
+    _log(f"Consolidacao OK | tickets={len(df_geral):,} | status={df_geral['status'].value_counts().to_dict()}")
 
-    # 3. Analises
+    # ── Etapa 5: analises ───────────────────────────────────────────────
+    status_ui.update(label="[5/6] Calculando SLAs, funil e agrupamentos...")
+    _log("Calculando analises...")
+
     df_sla_p   = prd.make_sla_em_processo(df_geral)
+    _log(f"SLA em processo OK | {len(df_sla_p):,} tickets")
+
     df_sla_r   = prd.make_sla_resposta(df_geral)
+    _log(f"SLA resposta OK | {len(df_sla_r):,} tickets")
+
     df_funil_m = prd.make_funil_mensal(df_geral)
     df_funil_s = prd.make_funil_semanal(df_geral)
+    _log(f"Funil OK | {len(df_funil_m)} meses / {len(df_funil_s)} semanas")
+
     df_assunto = prd.make_por_assunto(df_geral)
     df_escrit  = prd.make_por_escritorio(df_geral)
+    _log(f"Agrupamentos OK | {len(df_assunto)} assuntos / {len(df_escrit)} escritorios")
 
-    # 4. Gera XLSX em arquivo temp -> bytes para download
+    # ── Etapa 6: gera XLSX ──────────────────────────────────────────────
+    status_ui.update(label="[6/6] Gerando XLSX para download...")
+    _log("Gerando XLSX...")
+
     with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
         xlsx_path = Path(tmp.name)
 
@@ -114,6 +147,8 @@ def executar_pipeline(file_bytes: bytes) -> dict:
     })
     xlsx_bytes = xlsx_path.read_bytes()
     xlsx_path.unlink(missing_ok=True)
+    _log(f"XLSX OK | {len(xlsx_bytes):,} bytes")
+    _log("PIPELINE CONCLUIDO")
 
     return {
         "enc":          enc,
@@ -554,21 +589,24 @@ def main():
         tela_inicial()
         return
 
-    # Com arquivo — processa
-    prog = st.progress(0, text="Iniciando pipeline...")
-    try:
-        prog.progress(20, text="Validando e corrigindo encoding...")
-        prog.progress(50, text="Consolidando tickets...")
-        prog.progress(70, text="Calculando SLAs e funil...")
-        result = executar_pipeline(uploaded.getvalue())
-        prog.progress(100, text="Concluido!")
-    except Exception as e:
-        prog.empty()
-        st.error(f"Erro no processamento: {e}")
-        st.exception(e)
-        return
+    # Com arquivo — processa (usa session_state para nao reprocessar ao mudar de aba)
+    cache_key = f"result_{uploaded.file_id}"
+    if cache_key not in st.session_state:
+        with st.status("Processando arquivo...", expanded=True) as status_ui:
+            try:
+                result = executar_pipeline(uploaded.getvalue(), status_ui)
+                status_ui.update(label="Processamento concluido!", state="complete", expanded=False)
+                st.session_state[cache_key] = result
+            except Exception as e:
+                status_ui.update(label=f"Erro: {e}", state="error", expanded=True)
+                _log(f"ERRO: {e}")
+                import traceback
+                _log(traceback.format_exc())
+                st.error(f"Erro no processamento: {e}")
+                st.exception(e)
+                return
 
-    prog.empty()
+    result = st.session_state[cache_key]
 
     # Cabecalho
     st.title("📊 Dashboard BKO — Tickets")
