@@ -8,15 +8,14 @@ Uso: streamlit run dashboard_bko.py
      (ou via rodar_dashboard.bat)
 """
 
-import io
 import sys
 import tempfile
+import traceback
 from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -82,6 +81,20 @@ def executar_pipeline(file_bytes: bytes, status_ui) -> dict:
         tmp_path.unlink(missing_ok=True)
 
     _log(f"Leitura OK | encoding={enc} | linhas={len(df_raw):,} | colunas={len(df_raw.columns)}")
+    _log(f"Colunas encontradas: {list(df_raw.columns)}")
+
+    # Valida colunas minimas obrigatorias
+    COLUNAS_OBRIGATORIAS = {"ticket_id", "ticket_subject", "open_at", "status"}
+    faltando = COLUNAS_OBRIGATORIAS - set(df_raw.columns)
+    if faltando:
+        msg = (
+            f"Colunas nao encontradas: {faltando}\n\n"
+            f"Colunas presentes no arquivo ({len(df_raw.columns)}): "
+            f"{list(df_raw.columns)}\n\n"
+            "Verifique se o arquivo usa separador ';' e foi gerado pelo sistema de tickets."
+        )
+        _log(f"ERRO validacao colunas: {msg}")
+        raise ValueError(msg)
 
     # ── Etapa 2: limpeza ────────────────────────────────────────────────
     status_ui.update(label="[2/6] Limpando caracteres especiais...")
@@ -600,7 +613,6 @@ def main():
             except Exception as e:
                 status_ui.update(label=f"Erro: {e}", state="error", expanded=True)
                 _log(f"ERRO: {e}")
-                import traceback
                 _log(traceback.format_exc())
                 st.error(f"Erro no processamento: {e}")
                 st.exception(e)
