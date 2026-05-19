@@ -445,7 +445,7 @@ def _build_pdf(result: dict) -> bytes:
 
     # Funil Mensal (sem coluna Abertos — so fechados e em_processo)
     _section_title(pdf, "Funil Mensal")
-    heads_f = ["Periodo",  "Fechados", "Em Processo", "% Fechado", "Resp. Med (h)"]
+    heads_f = ["Periodo",  "Fechados", "Em Processo", "% Fechado", "SLA"]
     wids_f  = [45, 33, 38, 34, 30]
     alns_f  = ["C", "R",  "R",         "R",          "R"]
     cols_f  = ["periodo", "tickets_fechados", "em_processo",
@@ -465,7 +465,7 @@ def _build_pdf(result: dict) -> bytes:
     pdf.add_page()
 
     _section_title(pdf, "Top 10 Assuntos por Volume")
-    heads_a = ["Assunto",  "Total", "Fechados", "Em Proc.", "% Fech.", "Resp. Med (h)"]
+    heads_a = ["Assunto",  "Total", "Fechados", "Em Proc.", "% Fech.", "SLA"]
     wids_a  = [60, 20, 24, 26, 22, 28]
     alns_a  = ["L", "R",  "R",  "R",      "R",      "R"]
     _pdf_table_header(pdf, heads_a, wids_a, alns_a)
@@ -483,7 +483,7 @@ def _build_pdf(result: dict) -> bytes:
     pdf.ln(7)
 
     _section_title(pdf, "Top 10 Escritorios")
-    heads_e = ["Escritorio", "Total", "Fechados", "Pendentes", "% Fech.", "Resp. Med (h)"]
+    heads_e = ["Escritorio", "Total", "Fechados", "Pendentes", "% Fech.", "SLA"]
     wids_e  = [54, 20, 24, 28, 22, 32]
     alns_e  = ["L", "R",  "R",  "R",       "R",      "R"]
     _pdf_table_header(pdf, heads_e, wids_e, alns_e)
