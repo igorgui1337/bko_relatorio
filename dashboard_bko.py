@@ -19,6 +19,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 from dotenv import load_dotenv
+from fpdf import FPDF
 
 load_dotenv()  # carrega .env em desenvolvimento local (no-op no Streamlit Cloud)
 
