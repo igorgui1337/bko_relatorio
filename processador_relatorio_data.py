@@ -30,6 +30,7 @@ from pathlib import Path
 
 import pandas as pd
 from openpyxl.chart import BarChart, LineChart, PieChart, Reference
+from openpyxl.chart.label import DataLabelList
 from openpyxl.chart.series import DataPoint
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
@@ -404,6 +405,16 @@ def _set_color(series, fill_hex: str) -> None:
         pass
 
 
+def _add_labels(chart, show_pct: bool = False) -> None:
+    """Adiciona rótulos de dados em um gráfico openpyxl."""
+    chart.dLbls = DataLabelList()
+    chart.dLbls.showVal = True
+    chart.dLbls.showCatName = False
+    chart.dLbls.showSerName = False
+    chart.dLbls.showLegendKey = False
+    chart.dLbls.showPercent = show_pct
+
+
 def _col(df: pd.DataFrame, name: str) -> int:
     return df.columns.get_loc(name) + 1
 
@@ -434,6 +445,7 @@ def _chart_funil(ws, df: pd.DataFrame) -> None:
         _set_color(bar.series[-1], color)
 
     bar.set_categories(cats)
+    _add_labels(bar)
     ws.add_chart(bar, f"A{chart_row}")
 
     # Line: tempo medio resposta
@@ -448,6 +460,7 @@ def _chart_funil(ws, df: pd.DataFrame) -> None:
                          min_row=1, max_row=n)
     line.add_data(ref_resp, titles_from_data=True)
     line.set_categories(cats)
+    _add_labels(line)
     try:
         line.series[0].graphicalProperties.line.solidFill = _C_PRINCIPAL
         line.series[0].graphicalProperties.line.width = 25000
@@ -485,6 +498,7 @@ def _chart_por_assunto(ws, df: pd.DataFrame) -> None:
 
     cats = Reference(ws, min_col=_col(df, "assunto"), min_row=2, max_row=n)
     bar.set_categories(cats)
+    _add_labels(bar)
     ws.add_chart(bar, f"A{chart_row}")
 
 
@@ -515,6 +529,7 @@ def _chart_por_escritorio(ws, df: pd.DataFrame) -> None:
         _set_color(bar.series[-1], color)
 
     bar.set_categories(cats)
+    _add_labels(bar)
     ws.add_chart(bar, f"A{chart_row}")
 
     # Tempo medio resposta
@@ -531,6 +546,7 @@ def _chart_por_escritorio(ws, df: pd.DataFrame) -> None:
     bar2.add_data(ref_resp, titles_from_data=True)
     bar2.set_categories(cats)
     _set_color(bar2.series[0], _C_PROCESSO)
+    _add_labels(bar2)
 
     ws.add_chart(bar2, f"{get_column_letter(len(df.columns) + 2)}{chart_row}")
 
@@ -560,6 +576,7 @@ def _chart_aba_geral(ws, df: pd.DataFrame) -> None:
     data   = Reference(ws, min_col=2, min_row=summary_row,     max_row=summary_row + n_s)
     pie.add_data(data, titles_from_data=True)
     pie.set_categories(labels)
+    _add_labels(pie, show_pct=True)
 
     colors_status = [_C_FECHADO, _C_PROCESSO, _C_ABERTO, _C_ALERTA]
     for i, color in enumerate(colors_status[:n_s]):
