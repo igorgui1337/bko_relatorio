@@ -988,7 +988,7 @@ def tela_inicial():
 # ---------------------------------------------------------------------------
 
 def main():
-    # Sidebar
+    # ── Sidebar — bloco único (evita double-context no Streamlit 1.57+) ─────
     with st.sidebar:
         st.markdown("## 📊 BKO Dashboard")
         st.markdown("---")
@@ -1005,12 +1005,61 @@ def main():
         st.markdown("---")
         st.caption(f"SLA alerta configurado: > {prd.SLA_ALERTA_H}h")
 
-    # Sem arquivo — tela inicial
+        # Exportar — lê do session_state (disponível após pipeline concluir)
+        if uploaded:
+            _ck  = f"result_{uploaded.file_id}"
+            _pk  = f"pdf_{uploaded.file_id}"
+            _res = st.session_state.get(_ck)
+            _pdf = st.session_state.get(_pk, b"")
+
+            if _res is not None:
+                st.markdown("---")
+                st.markdown("#### 📥 Exportar")
+
+                st.download_button(
+                    label="📊 Baixar XLSX completo",
+                    data=_res["xlsx"],
+                    file_name=f"relatorio_bko_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    width='stretch',
+                )
+
+                if _pdf:
+                    st.download_button(
+                        label="📄 Baixar PDF",
+                        data=_pdf,
+                        file_name=f"relatorio_bko_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                        mime="application/pdf",
+                        width='stretch',
+                    )
+                else:
+                    st.caption("PDF indisponivel — verifique os logs.")
+
+                st.markdown("---")
+                st.markdown("#### 📧 Enviar por E-mail")
+                dest = st.text_input(
+                    "Destinatario",
+                    placeholder="email@exemplo.com",
+                    key="email_dest",
+                )
+                if st.button("Enviar Relatorio", width='stretch', key="btn_email"):
+                    if not dest or "@" not in dest:
+                        st.warning("Informe um e-mail valido.")
+                    else:
+                        _ph = st.empty()
+                        _ph.info(f"Enviando para {dest}...")
+                        try:
+                            _enviar_email(dest, _res["xlsx"], _res["ref_time"])
+                            _ph.success(f"E-mail enviado para **{dest}**!")
+                        except Exception as e_mail:
+                            _ph.error(str(e_mail))
+
+    # ── Sem arquivo — tela inicial ───────────────────────────────────────────
     if uploaded is None:
         tela_inicial()
         return
 
-    # Com arquivo — processa (usa session_state para nao reprocessar ao mudar de aba)
+    # ── Com arquivo — pipeline ───────────────────────────────────────────────
     file_ext  = uploaded.name.rsplit(".", 1)[-1]
     cache_key = f"result_{uploaded.file_id}"
     if cache_key not in st.session_state:
@@ -1043,7 +1092,7 @@ def main():
             for av in result["avisos"]:
                 st.warning(av)
 
-    # PDF — gerado fora do sidebar para evitar conflito de contexto Streamlit
+    # PDF gerado fora do sidebar (evita conflito de contexto com st.spinner)
     pdf_key = f"pdf_{uploaded.file_id}"
     if pdf_key not in st.session_state:
         with st.spinner("Gerando PDF..."):
@@ -1053,49 +1102,7 @@ def main():
             except Exception as e_pdf:
                 _log(f"Erro ao gerar PDF: {e_pdf}")
                 st.session_state[pdf_key] = b""
-
-    pdf_bytes = st.session_state.get(pdf_key, b"")
-
-    # Downloads e e-mail na sidebar
-    with st.sidebar:
-        st.markdown("#### 📥 Exportar")
-
-        st.download_button(
-            label="📊 Baixar XLSX completo",
-            data=result["xlsx"],
-            file_name=f"relatorio_bko_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            width='stretch',
-        )
-
-        if pdf_bytes:
-            st.download_button(
-                label="📄 Baixar PDF",
-                data=pdf_bytes,
-                file_name=f"relatorio_bko_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                mime="application/pdf",
-                width='stretch',
-            )
-        else:
-            st.caption("PDF indisponivel — verifique os logs.")
-
-        st.markdown("---")
-        st.markdown("#### 📧 Enviar por E-mail")
-        dest = st.text_input(
-            "Destinatario",
-            placeholder="email@exemplo.com",
-            key="email_dest",
-        )
-        if st.button("Enviar Relatorio", width='stretch', key="btn_email"):
-            if not dest or "@" not in dest:
-                st.warning("Informe um e-mail valido.")
-            else:
-                with st.spinner(f"Enviando para {dest}..."):
-                    try:
-                        _enviar_email(dest, result["xlsx"], result["ref_time"])
-                        st.success(f"E-mail enviado para **{dest}**!")
-                    except Exception as e_mail:
-                        st.error(str(e_mail))
+        st.rerun()  # atualiza sidebar para exibir botao PDF
 
     # Big numbers
     st.markdown("---")
