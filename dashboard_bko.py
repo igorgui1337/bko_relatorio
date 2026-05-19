@@ -629,7 +629,7 @@ def tab_geral(df: pd.DataFrame):
         "mes_abertura":        st.column_config.TextColumn("Mes"),
         "semana_abertura":     st.column_config.TextColumn("Semana"),
     }
-    st.dataframe(df, use_container_width=True, height=520, column_config=col_cfg)
+    st.dataframe(df, width='stretch', height=520, column_config=col_cfg)
 
 
 # ---- SLA Em Processo ----
@@ -659,7 +659,7 @@ def tab_sla_processo(df: pd.DataFrame):
         fig.add_vline(x=prd.SLA_ALERTA_H, line_dash="dash", line_color=COR_ALERTA,
                       annotation_text=f"{prd.SLA_ALERTA_H}h (alerta)", annotation_position="top right")
         fig.update_layout(margin=dict(t=40, b=20))
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
     with col_escrit:
         df_top = (
@@ -678,7 +678,7 @@ def tab_sla_processo(df: pd.DataFrame):
         )
         fig2.update_traces(textposition="outside", cliponaxis=False)
         fig2.update_layout(margin=dict(t=40, b=20, r=60))
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, width='stretch')
 
     st.subheader("Tabela Detalhada")
     col_cfg = {
@@ -693,7 +693,7 @@ def tab_sla_processo(df: pd.DataFrame):
         "consultor":        st.column_config.TextColumn("Consultor BP"),
         "escritorio":       st.column_config.TextColumn("Escritorio"),
     }
-    st.dataframe(df, use_container_width=True, height=420, column_config=col_cfg)
+    st.dataframe(df, width='stretch', height=420, column_config=col_cfg)
 
 
 # ---- SLA Resposta ----
@@ -723,7 +723,7 @@ def tab_sla_resposta(df: pd.DataFrame):
             color_discrete_sequence=[COR_PRINCIPAL],
         )
         fig_h.update_layout(margin=dict(t=40, b=20))
-        st.plotly_chart(fig_h, use_container_width=True)
+        st.plotly_chart(fig_h, width='stretch')
 
     with col_box:
         df_escrit_resp = df[df["escritorio"].ne("") & df["tempo_resposta_h"].notna()]
@@ -744,7 +744,7 @@ def tab_sla_resposta(df: pd.DataFrame):
             color_discrete_sequence=[COR_PRINCIPAL],
         )
         fig_box.update_layout(margin=dict(t=40, b=20), height=420)
-        st.plotly_chart(fig_box, use_container_width=True)
+        st.plotly_chart(fig_box, width='stretch')
 
     st.subheader("Tabela Detalhada")
     col_cfg = {
@@ -758,7 +758,7 @@ def tab_sla_resposta(df: pd.DataFrame):
         "consultor":        st.column_config.TextColumn("Consultor BP"),
         "escritorio":       st.column_config.TextColumn("Escritorio"),
     }
-    st.dataframe(df, use_container_width=True, height=420, column_config=col_cfg)
+    st.dataframe(df, width='stretch', height=420, column_config=col_cfg)
 
 
 # ---- Funil ----
@@ -782,7 +782,7 @@ def tab_funil(df_m: pd.DataFrame, df_s: pd.DataFrame):
     )
     fig_m.update_traces(textposition="outside", cliponaxis=False)
     fig_m.update_layout(legend_title_text="", margin=dict(t=40, b=20, r=60))
-    st.plotly_chart(fig_m, use_container_width=True)
+    st.plotly_chart(fig_m, width='stretch')
 
     c1, c2 = st.columns(2)
     with c1:
@@ -795,7 +795,7 @@ def tab_funil(df_m: pd.DataFrame, df_s: pd.DataFrame):
         )
         fig_rm.update_traces(textposition="outside", cliponaxis=False)
         fig_rm.update_layout(margin=dict(t=40, b=20))
-        st.plotly_chart(fig_rm, use_container_width=True)
+        st.plotly_chart(fig_rm, width='stretch')
 
     with c2:
         fig_pm = px.bar(
@@ -807,7 +807,7 @@ def tab_funil(df_m: pd.DataFrame, df_s: pd.DataFrame):
         )
         fig_pm.update_traces(textposition="outside", cliponaxis=False)
         fig_pm.update_layout(margin=dict(t=40, b=20))
-        st.plotly_chart(fig_pm, use_container_width=True)
+        st.plotly_chart(fig_pm, width='stretch')
 
     st.subheader("Funil Semanal")
     fig_s = px.bar(
@@ -826,16 +826,16 @@ def tab_funil(df_m: pd.DataFrame, df_s: pd.DataFrame):
     )
     fig_s.update_traces(textposition="outside", cliponaxis=False)
     fig_s.update_layout(legend_title_text="", margin=dict(t=40, b=20, r=60))
-    st.plotly_chart(fig_s, use_container_width=True)
+    st.plotly_chart(fig_s, width='stretch')
 
     st.subheader("Dados do Funil")
     c_esq, c_dir = st.columns(2)
     with c_esq:
         st.caption("Mensal")
-        st.dataframe(df_m, use_container_width=True)
+        st.dataframe(df_m, width='stretch')
     with c_dir:
         st.caption("Semanal")
-        st.dataframe(df_s, use_container_width=True)
+        st.dataframe(df_s, width='stretch')
 
 
 # ---- Por Assunto ----
@@ -858,7 +858,7 @@ def tab_por_assunto(df: pd.DataFrame):
     fig.update_traces(textposition="outside", cliponaxis=False)
     fig.update_layout(height=600, coloraxis_colorbar_title="% Fechado",
                       margin=dict(t=40, b=20, r=60))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
     st.subheader("Tabela Completa")
     col_cfg = {
@@ -872,7 +872,7 @@ def tab_por_assunto(df: pd.DataFrame):
         "tempo_medio_processo_h":   st.column_config.NumberColumn("Proc. Medio (h)", format="%.1f"),
         "n_transferencias_medio":   st.column_config.NumberColumn("Transfer. Medio", format="%.1f"),
     }
-    st.dataframe(df, use_container_width=True, column_config=col_cfg)
+    st.dataframe(df, width='stretch', column_config=col_cfg)
 
 
 # ---- Por Escritorio ----
@@ -898,7 +898,7 @@ def tab_por_escritorio(df: pd.DataFrame):
         fig_v.update_traces(textposition="outside", cliponaxis=False)
         fig_v.update_layout(coloraxis_colorbar_title="% Fechado",
                             margin=dict(t=40, b=20, r=60))
-        st.plotly_chart(fig_v, use_container_width=True)
+        st.plotly_chart(fig_v, width='stretch')
 
     with c_resp:
         fig_r = px.bar(
@@ -913,7 +913,7 @@ def tab_por_escritorio(df: pd.DataFrame):
         )
         fig_r.update_traces(textposition="outside", cliponaxis=False)
         fig_r.update_layout(margin=dict(t=40, b=20, r=60))
-        st.plotly_chart(fig_r, use_container_width=True)
+        st.plotly_chart(fig_r, width='stretch')
 
     # Pendentes vs Fechados lado a lado
     df_status = df[["escritorio", "fechados", "pendentes"]].sort_values(
@@ -932,7 +932,7 @@ def tab_por_escritorio(df: pd.DataFrame):
     )
     fig_comp.update_traces(textposition="outside", cliponaxis=False)
     fig_comp.update_layout(legend_title_text="", margin=dict(t=40, b=20, r=60))
-    st.plotly_chart(fig_comp, use_container_width=True)
+    st.plotly_chart(fig_comp, width='stretch')
 
     st.subheader("Tabela Detalhada por Escritorio")
     col_cfg = {
@@ -948,7 +948,7 @@ def tab_por_escritorio(df: pd.DataFrame):
         "tempo_max_resposta_h":    st.column_config.NumberColumn("Resp. Max (h)",    format="%.1f"),
         "tempo_medio_processo_h":  st.column_config.NumberColumn("Proc. Medio (h)", format="%.1f"),
     }
-    st.dataframe(df, use_container_width=True, column_config=col_cfg)
+    st.dataframe(df, width='stretch', column_config=col_cfg)
 
 
 # ---------------------------------------------------------------------------
@@ -1065,7 +1065,7 @@ def main():
             data=result["xlsx"],
             file_name=f"relatorio_bko_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
+            width='stretch',
         )
 
         if pdf_bytes:
@@ -1074,7 +1074,7 @@ def main():
                 data=pdf_bytes,
                 file_name=f"relatorio_bko_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
                 mime="application/pdf",
-                use_container_width=True,
+                width='stretch',
             )
         else:
             st.caption("PDF indisponivel — verifique os logs.")
@@ -1086,7 +1086,7 @@ def main():
             placeholder="email@exemplo.com",
             key="email_dest",
         )
-        if st.button("Enviar Relatorio", use_container_width=True, key="btn_email"):
+        if st.button("Enviar Relatorio", width='stretch', key="btn_email"):
             if not dest or "@" not in dest:
                 st.warning("Informe um e-mail valido.")
             else:
