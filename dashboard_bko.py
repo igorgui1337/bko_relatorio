@@ -189,39 +189,127 @@ def executar_pipeline(file_bytes: bytes, file_ext: str, status_ui) -> dict:
 # ---------------------------------------------------------------------------
 
 def _trunc(s: str, n: int) -> str:
-    """Trunca string para n chars (latin-1 safe) e adiciona '...' se necessário."""
+    """Trunca string para n chars (latin-1 safe) e adiciona '...' se necessario."""
     s = str(s).encode("latin-1", errors="replace").decode("latin-1")
     return s[: n - 3] + "..." if len(s) > n else s
 
 
-def _pdf_section(pdf, title: str) -> None:
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_text_color(31, 56, 100)
-    pdf.cell(0, 8, text=title, new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(1)
+class _RelatorioPDF(FPDF):
+    """PDF com cabecalho azul e rodape com numero de pagina (a partir da pag. 2)."""
+
+    def __init__(self, ref: str):
+        super().__init__()
+        self._ref = ref
+
+    def header(self):
+        if self.page_no() == 1:
+            return
+        self.set_fill_color(31, 56, 100)
+        self.rect(0, 0, self.w, 12, "F")
+        self.set_font("Helvetica", "B", 8)
+        self.set_text_color(255, 255, 255)
+        self.set_xy(15, 2)
+        self.cell(130, 8, text="Relatorio BKO - Tickets", new_x="RIGHT", new_y="TOP")
+        self.cell(0, 8, text=self._ref, align="R")
+        self.set_xy(self.l_margin, self.t_margin)
+
+    def footer(self):
+        self.set_y(-12)
+        self.set_draw_color(180, 180, 180)
+        self.line(self.l_margin, self.get_y(),
+                  self.w - self.r_margin, self.get_y())
+        self.set_font("Helvetica", "I", 7)
+        self.set_text_color(150, 150, 150)
+        self.cell(0, 8, text=f"Pagina {self.page_no()}", align="C")
 
 
-def _pdf_table_header(pdf, headers: list, widths: list) -> None:
-    pdf.set_fill_color(31, 56, 100)
+def _section_title(pdf, title: str) -> None:
+    """Faixa colorida de titulo de secao."""
+    pdf.set_fill_color(44, 62, 80)
     pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 9)
-    for h, w in zip(headers, widths):
-        pdf.cell(w, 7, text=h, border=1, fill=True, align="C",
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(0, 8, text=f"  {title}", fill=True,
+             new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(2)
+    pdf.set_text_color(0, 0, 0)
+
+
+def _pdf_table_header(pdf, headers: list, widths: list,
+                      aligns: list | None = None) -> None:
+    if aligns is None:
+        aligns = ["C"] * len(headers)
+    pdf.set_fill_color(52, 73, 94)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 8)
+    for h, w, a in zip(headers, widths, aligns):
+        pdf.cell(w, 7, text=h, border=1, fill=True, align=a,
                  new_x="RIGHT", new_y="TOP")
     pdf.ln(7)
 
 
-def _pdf_table_row(pdf, values: list, widths: list, idx: int) -> None:
-    if idx % 2 == 0:
-        pdf.set_fill_color(240, 245, 255)
-    else:
-        pdf.set_fill_color(255, 255, 255)
-    pdf.set_text_color(0, 0, 0)
+def _pdf_table_row(pdf, values: list, widths: list, idx: int,
+                   aligns: list | None = None) -> None:
+    if aligns is None:
+        aligns = ["C"] * len(values)
+    pdf.set_fill_color(245, 248, 252) if idx % 2 == 0 else pdf.set_fill_color(255, 255, 255)
+    pdf.set_text_color(30, 30, 30)
     pdf.set_font("Helvetica", "", 8)
-    for val, w in zip(values, widths):
-        pdf.cell(w, 6, text=_trunc(str(val), 40), border=1, fill=True, align="C",
-                 new_x="RIGHT", new_y="TOP")
+    for val, w, a in zip(values, widths, aligns):
+        pdf.cell(w, 6, text=_trunc(str(val), 50), border="LRB",
+                 fill=True, align=a, new_x="RIGHT", new_y="TOP")
     pdf.ln(6)
+
+
+def _pdf_kpi_row(pdf, kpis: list) -> None:
+    """
+    Renderiza cards KPI com barra de acento colorida no topo.
+    kpis = [(label, value, sub_text, color_hex), ...]
+    """
+    content_w = pdf.w - pdf.l_margin - pdf.r_margin
+    gap  = 3
+    cw   = content_w / len(kpis)
+    card = cw - gap
+    x0   = pdf.l_margin
+    y0   = pdf.get_y()
+
+    for i, (label, value, sub, color) in enumerate(kpis):
+        r, g, b = int(color[0:2], 16), int(color[2:4], 16), int(color[4:6], 16)
+        x = x0 + i * cw
+
+        # Barra de acento (topo do card)
+        pdf.set_fill_color(r, g, b)
+        pdf.rect(x, y0, card, 3, "F")
+
+        # Fundo do card
+        pdf.set_fill_color(250, 251, 253)
+        pdf.set_draw_color(210, 215, 220)
+        pdf.rect(x, y0 + 3, card, 24, "FD")
+
+        # Numero principal
+        pdf.set_font("Helvetica", "B", 15)
+        pdf.set_text_color(r, g, b)
+        pdf.set_xy(x, y0 + 5)
+        pdf.cell(card, 10, text=str(value), align="C",
+                 new_x="RIGHT", new_y="TOP")
+
+        # Texto secundario (ex: percentual)
+        if sub:
+            pdf.set_font("Helvetica", "", 7)
+            pdf.set_text_color(110, 110, 110)
+            pdf.set_xy(x, y0 + 15)
+            pdf.cell(card, 5, text=str(sub), align="C",
+                     new_x="RIGHT", new_y="TOP")
+
+        # Label
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.set_text_color(70, 70, 70)
+        pdf.set_xy(x, y0 + 21)
+        pdf.cell(card, 6, text=label, align="C",
+                 new_x="RIGHT", new_y="TOP")
+
+    pdf.set_xy(x0, y0 + 30)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_draw_color(0, 0, 0)
 
 
 def _pdf_add_charts(pdf, result: dict) -> None:
@@ -231,36 +319,41 @@ def _pdf_add_charts(pdf, result: dict) -> None:
 
         df_m = result["funil_m"]
         fig1 = px.bar(
-            df_m, x="periodo",
-            y=["tickets_abertos", "tickets_fechados", "em_processo"],
-            barmode="group",
-            title="Funil Mensal de Tickets",
+            df_m, y="periodo",
+            x=["tickets_fechados", "em_processo"],
+            barmode="group", orientation="h",
+            title="Funil Mensal — Fechados e Em Processo",
             color_discrete_map={
-                "tickets_abertos":  "#1F77B4",
                 "tickets_fechados": "#2CA02C",
                 "em_processo":      "#FF7F0E",
             },
         )
-        fig1.update_layout(height=350, width=720, margin=dict(t=40, b=30),
+        fig1.update_layout(height=380, width=720, margin=dict(t=50, b=30),
                            legend_title_text="", plot_bgcolor="white",
                            paper_bgcolor="white")
+        fig1.update_traces(textposition="outside", cliponaxis=False,
+                           texttemplate="%{x}")
 
         df_e = result["escrit"].sort_values("total_tickets", ascending=True).tail(15)
         fig2 = px.bar(
             df_e, x="total_tickets", y="escritorio", orientation="h",
             title="Volume por Escritorio (Top 15)",
-            color_discrete_sequence=["#1F3864"],
+            color="pct_fechado",
+            color_continuous_scale="RdYlGn", range_color=[0, 100],
+            text="total_tickets",
         )
-        fig2.update_layout(height=420, width=720, margin=dict(t=40, b=30),
-                           plot_bgcolor="white", paper_bgcolor="white")
+        fig2.update_layout(height=440, width=720, margin=dict(t=50, b=30),
+                           plot_bgcolor="white", paper_bgcolor="white",
+                           coloraxis_colorbar_title="% Fechado")
+        fig2.update_traces(textposition="outside", cliponaxis=False)
 
         charts = [
-            ("Funil Mensal", fig1),
-            ("Escritorios — Volume de Tickets", fig2),
+            ("Funil Mensal de Tickets", fig1),
+            ("Distribuicao por Escritorio", fig2),
         ]
 
         pdf.add_page()
-        _pdf_section(pdf, "Graficos")
+        _section_title(pdf, "Graficos")
 
         for title_fig, fig in charts:
             img_bytes = pio.to_image(fig, format="png", scale=1.5)
@@ -268,11 +361,11 @@ def _pdf_add_charts(pdf, result: dict) -> None:
                 tmp.write(img_bytes)
                 tmp_path = tmp.name
             try:
-                pdf.set_font("Helvetica", "I", 9)
-                pdf.set_text_color(80, 80, 80)
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_text_color(60, 60, 60)
                 pdf.cell(0, 6, text=title_fig, new_x="LMARGIN", new_y="NEXT")
                 pdf.image(tmp_path, w=180)
-                pdf.ln(6)
+                pdf.ln(8)
             finally:
                 Path(tmp_path).unlink(missing_ok=True)
 
@@ -281,109 +374,130 @@ def _pdf_add_charts(pdf, result: dict) -> None:
 
 
 def _build_pdf(result: dict) -> bytes:
-    """Gera PDF com KPIs, tabelas resumo e graficos (se kaleido disponivel)."""
-    from fpdf import FPDF
+    """Gera PDF com capa, KPIs, resumo SLA, tabelas e graficos."""
+    df_g   = result["geral"]
+    ref    = result["ref_time"]
+    total  = len(df_g)
+    fech   = int((df_g["status"] == "closed").sum())
+    proc   = int(df_g["status"].isin(["open", "processing"]).sum())
+    alert  = int((df_g["sla_alerta"] == "SIM").sum())
 
-    df_g  = result["geral"]
-    ref   = result["ref_time"]
-    total = len(df_g)
-    fech  = int((df_g["status"] == "closed").sum())
-    proc  = int(df_g["status"].isin(["open", "processing"]).sum())
-    alert = int((df_g["sla_alerta"] == "SIM").sum())
+    sla_p_med  = df_g["tempo_processo_h"].mean()
+    sla_p_max  = df_g["tempo_processo_h"].max()
+    sla_r_med  = df_g["tempo_resposta_h"].mean()
+    pct_alerta = alert / total * 100 if total else 0
 
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.set_margins(15, 15, 15)
+    pdf = _RelatorioPDF(ref)
+    pdf.set_auto_page_break(auto=True, margin=18)
+    pdf.set_margins(15, 22, 15)
+
+    # ─── Pagina 1: Capa + KPIs + Funil ────────────────────────────────────
     pdf.add_page()
 
-    # Titulo
-    pdf.set_font("Helvetica", "B", 20)
-    pdf.set_text_color(31, 56, 100)
-    pdf.cell(0, 12, text="Relatorio BKO - Tickets", align="C",
-             new_x="LMARGIN", new_y="NEXT")
-    pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(100, 100, 100)
-    pdf.cell(0, 6, text=f"Gerado em: {ref}", align="C",
-             new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(5)
-    pdf.set_draw_color(31, 56, 100)
-    pdf.line(15, pdf.get_y(), 195, pdf.get_y())
-    pdf.ln(6)
+    # Faixa de capa
+    pdf.set_fill_color(31, 56, 100)
+    pdf.rect(0, 0, pdf.w, 44, "F")
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 24)
+    pdf.set_xy(15, 7)
+    pdf.cell(0, 12, text="Relatorio BKO", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_xy(15, 20)
+    pdf.set_font("Helvetica", "", 12)
+    pdf.cell(0, 8, text="Dashboard de Tickets", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_xy(15, 31)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(160, 200, 255)
+    pdf.cell(0, 8, text=f"Gerado em {ref}", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_text_color(0, 0, 0)
 
-    # KPIs
-    cw = (pdf.w - 30) / 4
+    pdf.set_xy(15, 52)
+
+    # Cards KPI
     kpis = [
-        ("Total de Tickets", str(total),                         "1F3864"),
-        ("Fechados",         f"{fech} ({fech/total*100:.1f}%)",  "2CA02C"),
-        ("Em Processo",      str(proc),                          "FF7F0E"),
-        ("SLA Alerta >24h",  str(alert),                         "D62728"),
+        ("Total de Tickets", f"{total:,}",  "",                           "1F3864"),
+        ("Fechados",          f"{fech:,}",  f"{fech/total*100:.1f}% do total", "2CA02C"),
+        ("Em Processo",       f"{proc:,}",  f"{proc/total*100:.1f}% do total", "FF7F0E"),
+        ("SLA Alerta >24h",   f"{alert:,}", f"{pct_alerta:.1f}% do total",     "D62728"),
     ]
-    for _, value, color in kpis:
-        r, g, b = int(color[0:2], 16), int(color[2:4], 16), int(color[4:6], 16)
-        pdf.set_fill_color(r, g, b)
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_font("Helvetica", "B", 16)
-        pdf.cell(cw, 14, text=value, border=1, fill=True, align="C",
-                 new_x="RIGHT", new_y="TOP")
-    pdf.ln(14)
-    for label, _, _ in kpis:
-        pdf.set_text_color(80, 80, 80)
-        pdf.set_font("Helvetica", "", 8)
-        pdf.cell(cw, 6, text=label, align="C", new_x="RIGHT", new_y="TOP")
-    pdf.ln(12)
+    _pdf_kpi_row(pdf, kpis)
+    pdf.ln(3)
 
-    # Funil Mensal
-    _pdf_section(pdf, "Funil Mensal")
-    heads_f = ["Periodo", "Abertos", "Fechados", "Em Processo", "% Fechado", "Resp. Med (h)"]
-    wids_f  = [35, 25, 25, 32, 28, 35]
-    cols_f  = ["periodo", "tickets_abertos", "tickets_fechados",
-               "em_processo", "pct_fechado", "tempo_medio_resposta_h"]
-    _pdf_table_header(pdf, heads_f, wids_f)
+    # Faixa de resumo SLA
+    pdf.set_fill_color(240, 244, 248)
+    pdf.set_draw_color(200, 210, 220)
+    y_faixa = pdf.get_y()
+    pdf.rect(pdf.l_margin, y_faixa,
+             pdf.w - pdf.l_margin - pdf.r_margin, 10, "FD")
+    pdf.set_font("Helvetica", "", 8)
+    pdf.set_text_color(60, 60, 60)
+    pdf.set_xy(pdf.l_margin + 4, y_faixa + 1)
+    sla_items = [
+        f"Proc. Medio: {sla_p_med:.1f}h"  if pd.notna(sla_p_med)  else "Proc. Medio: -",
+        f"Proc. Maximo: {sla_p_max:.1f}h" if pd.notna(sla_p_max)  else "Proc. Max: -",
+        f"Resp. Media: {sla_r_med:.1f}h"  if pd.notna(sla_r_med)  else "Resp. Media: -",
+        f"Em Alerta: {pct_alerta:.1f}% dos tickets",
+    ]
+    pdf.cell(0, 8, text="   |   ".join(sla_items),
+             new_x="LMARGIN", new_y="NEXT")
+    pdf.set_draw_color(0, 0, 0)
+    pdf.ln(5)
+
+    # Funil Mensal (sem coluna Abertos — so fechados e em_processo)
+    _section_title(pdf, "Funil Mensal")
+    heads_f = ["Periodo",  "Fechados", "Em Processo", "% Fechado", "Resp. Med (h)"]
+    wids_f  = [45, 33, 38, 34, 30]
+    alns_f  = ["C", "R",  "R",         "R",          "R"]
+    cols_f  = ["periodo", "tickets_fechados", "em_processo",
+               "pct_fechado", "tempo_medio_resposta_h"]
+    _pdf_table_header(pdf, heads_f, wids_f, alns_f)
     for i, (_, row) in enumerate(result["funil_m"][cols_f].tail(12).iterrows()):
         resp = f"{row['tempo_medio_resposta_h']:.1f}" if pd.notna(row["tempo_medio_resposta_h"]) else "-"
         _pdf_table_row(pdf, [
             row["periodo"],
-            int(row["tickets_abertos"]),
-            int(row["tickets_fechados"]),
-            int(row["em_processo"]),
+            f"{int(row['tickets_fechados']):,}",
+            f"{int(row['em_processo']):,}",
             f"{row['pct_fechado']:.1f}%",
             resp,
-        ], wids_f, i)
+        ], wids_f, i, alns_f)
 
-    # Pagina 2: Assuntos + Escritorios
+    # ─── Pagina 2: Assuntos + Escritorios ─────────────────────────────────
     pdf.add_page()
 
-    _pdf_section(pdf, "Top 10 Assuntos por Volume")
-    heads_a = ["Assunto", "Total", "Fechados", "Em Processo", "% Fechado"]
-    wids_a  = [78, 22, 28, 32, 20]
-    _pdf_table_header(pdf, heads_a, wids_a)
+    _section_title(pdf, "Top 10 Assuntos por Volume")
+    heads_a = ["Assunto",  "Total", "Fechados", "Em Processo", "% Fechado", "Resp. Med (h)"]
+    wids_a  = [66, 20, 24, 30, 24, 16]
+    alns_a  = ["L", "R",  "R",  "R",          "R",           "R"]
+    _pdf_table_header(pdf, heads_a, wids_a, alns_a)
     for i, (_, row) in enumerate(result["assunto"].head(10).iterrows()):
+        resp = f"{row['tempo_medio_resposta_h']:.1f}" if pd.notna(row.get("tempo_medio_resposta_h")) else "-"
         _pdf_table_row(pdf, [
-            _trunc(row["assunto"], 40),
-            int(row["total"]),
-            int(row["fechados"]),
-            int(row["em_processo"]),
+            _trunc(row["assunto"], 36),
+            f"{int(row['total']):,}",
+            f"{int(row['fechados']):,}",
+            f"{int(row['em_processo']):,}",
             f"{row['pct_fechado']:.1f}%",
-        ], wids_a, i)
+            resp,
+        ], wids_a, i, alns_a)
 
-    pdf.ln(8)
+    pdf.ln(7)
 
-    _pdf_section(pdf, "Top 10 Escritorios")
+    _section_title(pdf, "Top 10 Escritorios")
     heads_e = ["Escritorio", "Total", "Fechados", "Pendentes", "% Fechado", "Resp. Med (h)"]
-    wids_e  = [52, 20, 25, 28, 25, 30]
-    _pdf_table_header(pdf, heads_e, wids_e)
+    wids_e  = [58, 20, 25, 28, 25, 24]
+    alns_e  = ["L", "R",  "R",  "R",         "R",           "R"]
+    _pdf_table_header(pdf, heads_e, wids_e, alns_e)
     for i, (_, row) in enumerate(result["escrit"].head(10).iterrows()):
         resp = f"{row['tempo_medio_resposta_h']:.1f}" if pd.notna(row.get("tempo_medio_resposta_h")) else "-"
         _pdf_table_row(pdf, [
-            _trunc(row["escritorio"], 28),
-            int(row["total_tickets"]),
-            int(row["fechados"]),
-            int(row["pendentes"]),
+            _trunc(row["escritorio"], 32),
+            f"{int(row['total_tickets']):,}",
+            f"{int(row['fechados']):,}",
+            f"{int(row['pendentes']):,}",
             f"{row['pct_fechado']:.1f}%",
             resp,
-        ], wids_e, i)
+        ], wids_e, i, alns_e)
 
-    # Pagina 3: Graficos (opcional — precisa de kaleido)
+    # ─── Pagina 3: Graficos (se kaleido disponivel) ────────────────────────
     _pdf_add_charts(pdf, result)
 
     return bytes(pdf.output())
