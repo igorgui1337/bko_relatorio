@@ -1,0 +1,19 @@
+# Dados — não versionar
+*.csv
+*.xlsx
+*.xls
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Ambiente virtual
+bko_env/
+venv/
+.venv/
+
+# OS
+.DS_Store
+Thumbs.db
