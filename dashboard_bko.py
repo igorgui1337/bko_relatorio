@@ -1043,6 +1043,19 @@ def main():
             for av in result["avisos"]:
                 st.warning(av)
 
+    # PDF — gerado fora do sidebar para evitar conflito de contexto Streamlit
+    pdf_key = f"pdf_{uploaded.file_id}"
+    if pdf_key not in st.session_state:
+        with st.spinner("Gerando PDF..."):
+            try:
+                st.session_state[pdf_key] = _build_pdf(result)
+                _log("PDF gerado com sucesso")
+            except Exception as e_pdf:
+                _log(f"Erro ao gerar PDF: {e_pdf}")
+                st.session_state[pdf_key] = b""
+
+    pdf_bytes = st.session_state.get(pdf_key, b"")
+
     # Downloads e e-mail na sidebar
     with st.sidebar:
         st.markdown("#### 📥 Exportar")
@@ -1055,26 +1068,16 @@ def main():
             use_container_width=True,
         )
 
-        # PDF — gerado uma vez por arquivo e cacheado na session_state
-        pdf_key = f"pdf_{uploaded.file_id}"
-        if pdf_key not in st.session_state:
-            with st.spinner("Gerando PDF..."):
-                try:
-                    st.session_state[pdf_key] = _build_pdf(result)
-                except Exception as e_pdf:
-                    _log(f"Erro ao gerar PDF: {e_pdf}")
-                    st.session_state[pdf_key] = None
-
-        if st.session_state[pdf_key]:
+        if pdf_bytes:
             st.download_button(
                 label="📄 Baixar PDF",
-                data=st.session_state[pdf_key],
+                data=pdf_bytes,
                 file_name=f"relatorio_bko_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
                 mime="application/pdf",
                 use_container_width=True,
             )
         else:
-            st.warning("PDF nao disponivel (erro na geracao).")
+            st.caption("PDF indisponivel — verifique os logs.")
 
         st.markdown("---")
         st.markdown("#### 📧 Enviar por E-mail")
