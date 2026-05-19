@@ -653,20 +653,20 @@ def tab_funil(df_m: pd.DataFrame, df_s: pd.DataFrame):
 
     fig_m = px.bar(
         df_m,
-        x="periodo",
-        y=["tickets_abertos", "tickets_fechados", "em_processo"],
+        y="periodo",
+        x=["tickets_fechados", "em_processo"],
         barmode="group",
+        orientation="h",
         title="Tickets por Mes",
         labels={"periodo": "Mes", "value": "Tickets", "variable": ""},
         color_discrete_map={
-            "tickets_abertos":  COR_ABERTO,
             "tickets_fechados": COR_FECHADO,
             "em_processo":      COR_PROCESSO,
         },
         text_auto=True,
     )
     fig_m.update_traces(textposition="outside", cliponaxis=False)
-    fig_m.update_layout(legend_title_text="", margin=dict(t=40, b=20))
+    fig_m.update_layout(legend_title_text="", margin=dict(t=40, b=20, r=60))
     st.plotly_chart(fig_m, use_container_width=True)
 
     c1, c2 = st.columns(2)
@@ -697,20 +697,20 @@ def tab_funil(df_m: pd.DataFrame, df_s: pd.DataFrame):
     st.subheader("Funil Semanal")
     fig_s = px.bar(
         df_s,
-        x="periodo",
-        y=["tickets_abertos", "tickets_fechados", "em_processo"],
+        y="periodo",
+        x=["tickets_fechados", "em_processo"],
         barmode="group",
+        orientation="h",
         title="Tickets por Semana",
         labels={"periodo": "Semana", "value": "Tickets", "variable": ""},
         color_discrete_map={
-            "tickets_abertos":  COR_ABERTO,
             "tickets_fechados": COR_FECHADO,
             "em_processo":      COR_PROCESSO,
         },
         text_auto=True,
     )
     fig_s.update_traces(textposition="outside", cliponaxis=False)
-    fig_s.update_layout(legend_title_text="", margin=dict(t=40, b=20))
+    fig_s.update_layout(legend_title_text="", margin=dict(t=40, b=20, r=60))
     st.plotly_chart(fig_s, use_container_width=True)
 
     st.subheader("Dados do Funil")

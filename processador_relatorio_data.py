@@ -429,17 +429,16 @@ def _chart_funil(ws, df: pd.DataFrame) -> None:
     cats = Reference(ws, min_col=_col(df, "periodo"), min_row=2, max_row=n)
     chart_row = n + 3
 
-    # Grouped column bar
+    # Barras horizontais — apenas fechados e em_processo
     bar = BarChart()
-    bar.type = "col"
+    bar.type = "bar"
     bar.grouping = "clustered"
     bar.title = "Funil de Tickets"
-    bar.y_axis.title = "Quantidade"
+    bar.x_axis.title = "Quantidade"
     bar.width = 22
     bar.height = 14
 
     for col_name, color in [
-        ("tickets_abertos",  _C_ABERTO),
         ("tickets_fechados", _C_FECHADO),
         ("em_processo",      _C_PROCESSO),
     ]:
