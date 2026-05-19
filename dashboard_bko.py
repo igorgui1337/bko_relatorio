@@ -465,14 +465,14 @@ def _build_pdf(result: dict) -> bytes:
     pdf.add_page()
 
     _section_title(pdf, "Top 10 Assuntos por Volume")
-    heads_a = ["Assunto",  "Total", "Fechados", "Em Processo", "% Fechado", "Resp. Med (h)"]
-    wids_a  = [66, 20, 24, 30, 24, 16]
-    alns_a  = ["L", "R",  "R",  "R",          "R",           "R"]
+    heads_a = ["Assunto",  "Total", "Fechados", "Em Proc.", "% Fech.", "Resp. Med (h)"]
+    wids_a  = [60, 20, 24, 26, 22, 28]
+    alns_a  = ["L", "R",  "R",  "R",      "R",      "R"]
     _pdf_table_header(pdf, heads_a, wids_a, alns_a)
     for i, (_, row) in enumerate(result["assunto"].head(10).iterrows()):
         resp = f"{row['tempo_medio_resposta_h']:.1f}" if pd.notna(row.get("tempo_medio_resposta_h")) else "-"
         _pdf_table_row(pdf, [
-            _trunc(row["assunto"], 36),
+            _trunc(row["assunto"], 34),
             f"{int(row['total']):,}",
             f"{int(row['fechados']):,}",
             f"{int(row['em_processo']):,}",
@@ -483,14 +483,14 @@ def _build_pdf(result: dict) -> bytes:
     pdf.ln(7)
 
     _section_title(pdf, "Top 10 Escritorios")
-    heads_e = ["Escritorio", "Total", "Fechados", "Pendentes", "% Fechado", "Resp. Med (h)"]
-    wids_e  = [58, 20, 25, 28, 25, 24]
-    alns_e  = ["L", "R",  "R",  "R",         "R",           "R"]
+    heads_e = ["Escritorio", "Total", "Fechados", "Pendentes", "% Fech.", "Resp. Med (h)"]
+    wids_e  = [54, 20, 24, 28, 22, 32]
+    alns_e  = ["L", "R",  "R",  "R",       "R",      "R"]
     _pdf_table_header(pdf, heads_e, wids_e, alns_e)
     for i, (_, row) in enumerate(result["escrit"].head(10).iterrows()):
         resp = f"{row['tempo_medio_resposta_h']:.1f}" if pd.notna(row.get("tempo_medio_resposta_h")) else "-"
         _pdf_table_row(pdf, [
-            _trunc(row["escritorio"], 32),
+            _trunc(row["escritorio"], 30),
             f"{int(row['total_tickets']):,}",
             f"{int(row['fechados']):,}",
             f"{int(row['pendentes']):,}",
