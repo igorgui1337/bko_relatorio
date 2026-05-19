@@ -59,7 +59,7 @@ def _log(msg: str):
     print(f"[BKO {datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
-def executar_pipeline(file_bytes: bytes, status_ui) -> dict:
+def executar_pipeline(file_bytes: bytes, file_ext: str, status_ui) -> dict:
     """
     ETL completo em memoria com logs em cada etapa.
     status_ui: contexto st.status() para atualizacao visual em tempo real.
@@ -69,14 +69,15 @@ def executar_pipeline(file_bytes: bytes, status_ui) -> dict:
     # ── Etapa 1: leitura e ETL ──────────────────────────────────────────
     status_ui.update(label="[1/6] Lendo arquivo e corrigindo encoding...")
     _log("INICIO pipeline")
-    _log(f"Arquivo: {len(file_bytes):,} bytes")
+    _log(f"Arquivo: {len(file_bytes):,} bytes | extensao: {file_ext}")
 
-    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
+    suffix = f".{file_ext.lower()}"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(file_bytes)
         tmp_path = Path(tmp.name)
 
     try:
-        df_raw, enc = vtk.read_csv_auto(tmp_path)
+        df_raw, enc = vtk.read_any_file(tmp_path)
     finally:
         tmp_path.unlink(missing_ok=True)
 
@@ -586,9 +587,9 @@ def main():
         st.markdown("---")
 
         uploaded = st.file_uploader(
-            "Carregar arquivo CSV",
-            type=["csv"],
-            help="CSV exportado do sistema de tickets (separador ;)",
+            "Carregar arquivo",
+            type=["csv", "xlsx", "xls"],
+            help="CSV (separador ;) ou XLSX exportado do sistema de tickets",
         )
 
         if uploaded:
@@ -603,11 +604,12 @@ def main():
         return
 
     # Com arquivo — processa (usa session_state para nao reprocessar ao mudar de aba)
+    file_ext  = uploaded.name.rsplit(".", 1)[-1]
     cache_key = f"result_{uploaded.file_id}"
     if cache_key not in st.session_state:
         with st.status("Processando arquivo...", expanded=True) as status_ui:
             try:
-                result = executar_pipeline(uploaded.getvalue(), status_ui)
+                result = executar_pipeline(uploaded.getvalue(), file_ext, status_ui)
                 status_ui.update(label="Processamento concluido!", state="complete", expanded=False)
                 st.session_state[cache_key] = result
             except Exception as e:

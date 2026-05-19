@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 validador_tabela_ticket.py
-ETL pipeline para arquivos CSV de tickets BKO.
+ETL pipeline para arquivos CSV e XLSX de tickets BKO.
 
 Transformações realizadas:
   1. Detecta e corrige encoding (Windows-1252 / Latin-1 → UTF-8)
@@ -11,11 +11,16 @@ Transformações realizadas:
        answered_at    → answered_at  +  answered_hora
        message_at     → message_at   +  message_hora
        previous_message_at → previous_message_at + previous_hora
+     Suporta formatos: "DD/MM/YYYY HH:MM" e "YYYY-MM-DD HH:MM:SS" (ISO/Excel)
   3. Valida integridade do arquivo e gera relatório
 
+Formatos de entrada suportados:
+  - CSV com separador ; (encoding auto-detectado: Latin-1, UTF-8, CP1252)
+  - XLSX / XLS (qualquer sheet — usa a primeira por padrão)
+
 Uso:
-    python validador_tabela_ticket.py <arquivo.csv>
-    python validador_tabela_ticket.py <arquivo.csv> <saida.csv>
+    python validador_tabela_ticket.py <arquivo.csv|xlsx>
+    python validador_tabela_ticket.py <arquivo.csv|xlsx> <saida.csv>
 """
 
 import sys
@@ -73,6 +78,36 @@ def read_csv_auto(path: Path) -> tuple[pd.DataFrame, str]:
     return df, "latin-1 (fallback)"
 
 
+def read_xlsx_file(path: Path, sheet: int = 0) -> tuple[pd.DataFrame, str]:
+    """
+    Lê arquivo XLSX/XLS. Usa a primeira aba por padrão.
+    Retorna (DataFrame, 'xlsx').
+    """
+    xl = pd.ExcelFile(path)
+    sheet_name = xl.sheet_names[sheet]
+    df = pd.read_excel(xl, sheet_name=sheet_name, dtype=str, keep_default_na=False)
+
+    # Normaliza nomes de colunas (remove espaços extras)
+    df.columns = [str(c).strip() for c in df.columns]
+
+    # Strip em todos os valores string
+    str_cols = df.select_dtypes(include=["object"]).columns
+    df[str_cols] = df[str_cols].apply(lambda s: s.str.strip())
+
+    return df, f"xlsx (aba: {sheet_name})"
+
+
+def read_any_file(path: Path) -> tuple[pd.DataFrame, str]:
+    """
+    Roteador: detecta CSV ou XLSX pelo sufixo e chama o leitor correto.
+    Retorna (DataFrame, encoding/formato).
+    """
+    suffix = path.suffix.lower()
+    if suffix in (".xlsx", ".xls"):
+        return read_xlsx_file(path)
+    return read_csv_auto(path)
+
+
 # ---------------------------------------------------------------------------
 # Correção de encoding residual na coluna B (ticket_subject)
 # ---------------------------------------------------------------------------
@@ -100,11 +135,27 @@ def _fix_residual_chars(series: pd.Series) -> pd.Series:
 # Divisão de colunas datetime
 # ---------------------------------------------------------------------------
 
+def _detect_datetime_format(series: pd.Series) -> str | None:
+    """
+    Detecta o formato de data/hora em uma coluna.
+    Retorna: 'br'  → "DD/MM/YYYY HH:MM"  (CSV nativo do sistema)
+             'iso' → "YYYY-MM-DD HH:MM"   (export Excel / ISO)
+             None  → coluna não tem hora combinada
+    """
+    sample = series.dropna().head(30)
+    if sample.str.contains(r"\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2}", regex=True, na=False).any():
+        return "br"
+    if sample.str.contains(r"\d{4}-\d{2}-\d{2}[\sT]\d{2}:\d{2}", regex=True, na=False).any():
+        return "iso"
+    return None
+
+
 def split_datetime_columns(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
     """
     Para cada par (data, hora):
     - Se a coluna hora já existe → pula (arquivo já processado)
-    - Se a coluna data contém data+hora combinadas → divide e insere coluna hora
+    - Detecta formato: BR ("DD/MM/YYYY HH:MM") ou ISO ("YYYY-MM-DD HH:MM:SS")
+    - Divide e insere coluna hora; datas ISO são convertidas para DD/MM/YYYY
     Retorna (df_modificado, lista_de_colunas_criadas)
     """
     created = []
@@ -112,20 +163,25 @@ def split_datetime_columns(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
         if date_col not in df.columns:
             continue
         if hora_col in df.columns:
-            continue  # já separado (arquivo de exemplo final)
+            continue  # já separado
 
-        # Testa se o padrão combinado existe: "DD/MM/YYYY HH:MM"
-        sample = df[date_col].dropna().head(20)
-        has_time = sample.str.contains(r"\d{2}/\d{2}/\d{4}\s+\d{2}:\d{2}", regex=True, na=False).any()
-        if not has_time:
-            continue  # coluna já contém só data ou está vazia
+        fmt = _detect_datetime_format(df[date_col])
+        if fmt is None:
+            continue
 
-        parts = df[date_col].str.strip().str.split(r"\s+", n=1, expand=True)
-        df[date_col] = parts[0].str.strip()
-        time_vals = parts[1].str.strip() if 1 in parts.columns else pd.Series([""] * len(df), index=df.index)
+        parts = df[date_col].str.strip().str.split(r"[\s T]+", n=1, expand=True)
+        raw_date = parts[0].str.strip()
+        raw_time = parts[1].str.strip().str.slice(0, 5) if 1 in parts.columns else pd.Series([""] * len(df), index=df.index)
 
+        if fmt == "iso":
+            # YYYY-MM-DD → DD/MM/YYYY
+            raw_date = raw_date.str.replace(
+                r"^(\d{4})-(\d{2})-(\d{2})$", r"\3/\2/\1", regex=True
+            )
+
+        df[date_col] = raw_date
         pos = df.columns.get_loc(date_col) + 1
-        df.insert(pos, hora_col, time_vals.fillna(""))
+        df.insert(pos, hora_col, raw_time.fillna(""))
         created.append(hora_col)
 
     return df, created
