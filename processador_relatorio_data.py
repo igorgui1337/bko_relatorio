@@ -59,9 +59,9 @@ HEADER_COLOR  = "1F3864"   # azul escuro
 OPEN_COLOR    = "FFF2CC"   # amarelo claro → ticket aberto
 PROC_COLOR    = "DEEBF7"   # azul claro → processing
 CLOSED_COLOR  = "E2EFDA"   # verde claro → closed
-ALERT_COLOR   = "FCE4D6"   # laranja → SLA estourado (> 48 h)
+ALERT_COLOR   = "FCE4D6"   # laranja → SLA estourado (> 24 h)
 
-SLA_ALERTA_H = 48           # horas → acima disso é alerta no SLA
+SLA_ALERTA_H = 24           # horas → acima disso é alerta no SLA
 
 
 # ---------------------------------------------------------------------------

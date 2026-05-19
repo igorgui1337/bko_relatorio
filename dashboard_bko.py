@@ -213,7 +213,7 @@ def big_numbers(df: pd.DataFrame):
               delta=f"{em_proc/total*100:.1f}%",   delta_color="inverse")
     c4.metric("Abertos",          f"{abertos:,}",
               delta_color="inverse")
-    c5.metric("SLA Alerta >48h",  f"{alertas:,}",
+    c5.metric("SLA Alerta >24h",  f"{alertas:,}",
               delta_color="inverse")
 
 
@@ -267,8 +267,8 @@ def tab_sla_processo(df: pd.DataFrame):
             labels={"tempo_processo_h": "Horas"},
             color_discrete_sequence=[COR_PROCESSO],
         )
-        fig.add_vline(x=48, line_dash="dash", line_color=COR_ALERTA,
-                      annotation_text="48h (alerta)", annotation_position="top right")
+        fig.add_vline(x=prd.SLA_ALERTA_H, line_dash="dash", line_color=COR_ALERTA,
+                      annotation_text=f"{prd.SLA_ALERTA_H}h (alerta)", annotation_position="top right")
         fig.update_layout(margin=dict(t=40, b=20))
         st.plotly_chart(fig, use_container_width=True)
 
