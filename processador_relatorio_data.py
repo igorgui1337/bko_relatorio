@@ -377,7 +377,11 @@ def _color_status_rows(ws, df: pd.DataFrame, status_col: str) -> None:
 
 
 def _sanitize_df(df: pd.DataFrame) -> pd.DataFrame:
-    """Remove caracteres ilegais para células Excel em todas as colunas string."""
+    """Converte datetime para string HH:MM (sem segundos) e remove chars ilegais."""
+    dt_cols = df.select_dtypes(include=["datetime64[ns]", "datetimetz"]).columns
+    for col in dt_cols:
+        df[col] = df[col].dt.strftime("%d/%m/%Y %H:%M").fillna("")
+
     for col in df.select_dtypes(include=["object", "str"]).columns:
         df[col] = df[col].astype(str).apply(
             lambda v: _ILLEGAL_CHARS.sub("", v) if isinstance(v, str) else v
@@ -609,7 +613,7 @@ def _add_charts_to_workbook(writer, sheets: dict[str, pd.DataFrame]) -> None:
 
 
 def write_xlsx(path: str, sheets: dict[str, pd.DataFrame]) -> None:
-    with pd.ExcelWriter(path, engine="openpyxl", datetime_format="DD/MM/YYYY HH:MM") as writer:
+    with pd.ExcelWriter(path, engine="openpyxl") as writer:
         for sheet_name, df in sheets.items():
             df = _sanitize_df(df.copy())
             df.to_excel(writer, sheet_name=sheet_name, index=False)
