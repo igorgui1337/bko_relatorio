@@ -285,8 +285,10 @@ def tab_sla_processo(df: pd.DataFrame):
             title="Escritorios com Mais Tickets Ativos",
             labels={"qtd": "Qtd", "escritorio": ""},
             color_discrete_sequence=[COR_PRINCIPAL],
+            text_auto=True,
         )
-        fig2.update_layout(margin=dict(t=40, b=20))
+        fig2.update_traces(textposition="outside", cliponaxis=False)
+        fig2.update_layout(margin=dict(t=40, b=20, r=60))
         st.plotly_chart(fig2, use_container_width=True)
 
     st.subheader("Tabela Detalhada")
@@ -387,7 +389,9 @@ def tab_funil(df_m: pd.DataFrame, df_s: pd.DataFrame):
             "tickets_fechados": COR_FECHADO,
             "em_processo":      COR_PROCESSO,
         },
+        text_auto=True,
     )
+    fig_m.update_traces(textposition="outside", cliponaxis=False)
     fig_m.update_layout(legend_title_text="", margin=dict(t=40, b=20))
     st.plotly_chart(fig_m, use_container_width=True)
 
@@ -398,7 +402,9 @@ def tab_funil(df_m: pd.DataFrame, df_s: pd.DataFrame):
             title="Tempo Medio de Resposta (h) por Mes",
             labels={"periodo": "Mes", "tempo_medio_resposta_h": "Horas"},
             color_discrete_sequence=[COR_PRINCIPAL],
+            text_auto=".1f",
         )
+        fig_rm.update_traces(textposition="outside", cliponaxis=False)
         fig_rm.update_layout(margin=dict(t=40, b=20))
         st.plotly_chart(fig_rm, use_container_width=True)
 
@@ -408,7 +414,9 @@ def tab_funil(df_m: pd.DataFrame, df_s: pd.DataFrame):
             title="Tempo Medio em Processo (h) por Mes",
             labels={"periodo": "Mes", "tempo_medio_processo_h": "Horas"},
             color_discrete_sequence=[COR_PROCESSO],
+            text_auto=".1f",
         )
+        fig_pm.update_traces(textposition="outside", cliponaxis=False)
         fig_pm.update_layout(margin=dict(t=40, b=20))
         st.plotly_chart(fig_pm, use_container_width=True)
 
@@ -425,7 +433,9 @@ def tab_funil(df_m: pd.DataFrame, df_s: pd.DataFrame):
             "tickets_fechados": COR_FECHADO,
             "em_processo":      COR_PROCESSO,
         },
+        text_auto=True,
     )
+    fig_s.update_traces(textposition="outside", cliponaxis=False)
     fig_s.update_layout(legend_title_text="", margin=dict(t=40, b=20))
     st.plotly_chart(fig_s, use_container_width=True)
 
@@ -454,9 +464,11 @@ def tab_por_assunto(df: pd.DataFrame):
         color="pct_fechado",
         color_continuous_scale="RdYlGn",
         range_color=[0, 100],
+        text="total",
     )
+    fig.update_traces(textposition="outside", cliponaxis=False)
     fig.update_layout(height=600, coloraxis_colorbar_title="% Fechado",
-                      margin=dict(t=40, b=20))
+                      margin=dict(t=40, b=20, r=60))
     st.plotly_chart(fig, use_container_width=True)
 
     st.subheader("Tabela Completa")
@@ -492,9 +504,11 @@ def tab_por_escritorio(df: pd.DataFrame):
             color="pct_fechado",
             color_continuous_scale="RdYlGn",
             range_color=[0, 100],
+            text="total_tickets",
         )
+        fig_v.update_traces(textposition="outside", cliponaxis=False)
         fig_v.update_layout(coloraxis_colorbar_title="% Fechado",
-                            margin=dict(t=40, b=20))
+                            margin=dict(t=40, b=20, r=60))
         st.plotly_chart(fig_v, use_container_width=True)
 
     with c_resp:
@@ -506,8 +520,10 @@ def tab_por_escritorio(df: pd.DataFrame):
             title="Tempo Medio de Resposta (h) por Escritorio",
             labels={"tempo_medio_resposta_h": "Horas", "escritorio": ""},
             color_discrete_sequence=[COR_PROCESSO],
+            text_auto=".1f",
         )
-        fig_r.update_layout(margin=dict(t=40, b=20))
+        fig_r.update_traces(textposition="outside", cliponaxis=False)
+        fig_r.update_layout(margin=dict(t=40, b=20, r=60))
         st.plotly_chart(fig_r, use_container_width=True)
 
     # Pendentes vs Fechados lado a lado
@@ -523,8 +539,10 @@ def tab_por_escritorio(df: pd.DataFrame):
         title="Fechados vs Pendentes por Escritorio (Top 20 fechados)",
         labels={"value": "Qtd", "escritorio": "", "variable": ""},
         color_discrete_map={"fechados": COR_FECHADO, "pendentes": COR_ALERTA},
+        text_auto=True,
     )
-    fig_comp.update_layout(legend_title_text="", margin=dict(t=40, b=20))
+    fig_comp.update_traces(textposition="outside", cliponaxis=False)
+    fig_comp.update_layout(legend_title_text="", margin=dict(t=40, b=20, r=60))
     st.plotly_chart(fig_comp, use_container_width=True)
 
     st.subheader("Tabela Detalhada por Escritorio")
