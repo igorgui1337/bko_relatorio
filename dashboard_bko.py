@@ -1207,39 +1207,9 @@ def tab_por_departamento(df: pd.DataFrame):
     fig_comp.update_layout(legend_title_text="", margin=dict(t=40, b=20, r=60))
     st.plotly_chart(fig_comp, width='stretch')
 
-    # Transferencias por departamento
-    if "n_transferencias_total" in df.columns:
-        col_tr1, col_tr2 = st.columns(2)
-        with col_tr1:
-            fig_tr = px.bar(
-                df.sort_values("n_transferencias_total", ascending=True),
-                x="n_transferencias_total",
-                y="departamento",
-                orientation="h",
-                title="Total de Transferencias por Departamento",
-                labels={"n_transferencias_total": "Transferencias", "departamento": ""},
-                color="n_transferencias_total",
-                color_continuous_scale="Reds",
-                text="n_transferencias_total",
-            )
-            fig_tr.update_traces(textposition="outside", cliponaxis=False)
-            fig_tr.update_layout(coloraxis_showscale=False, margin=dict(t=40, b=20, r=60))
-            st.plotly_chart(fig_tr, width='stretch')
-        with col_tr2:
-            fig_tm = px.bar(
-                df.sort_values("n_transferencias_medio", ascending=True),
-                x="n_transferencias_medio",
-                y="departamento",
-                orientation="h",
-                title="Media de Transferencias por Ticket",
-                labels={"n_transferencias_medio": "Transfer. / Ticket", "departamento": ""},
-                color="n_transferencias_medio",
-                color_continuous_scale="Oranges",
-                text_auto=".2f",
-            )
-            fig_tm.update_traces(textposition="outside", cliponaxis=False)
-            fig_tm.update_layout(coloraxis_showscale=False, margin=dict(t=40, b=20, r=60))
-            st.plotly_chart(fig_tm, width='stretch')
+    # Transferencias — dados em tratamento
+    st.subheader("Transferencias por Departamento")
+    st.info("🔧 Dados em tratamento.")
 
     st.subheader("Tabela por Departamento")
     col_cfg = {
@@ -1251,10 +1221,9 @@ def tab_por_departamento(df: pd.DataFrame):
         "com_sla_alerta":         st.column_config.NumberColumn("SLA Alerta"),
         "tempo_medio_resposta_h": st.column_config.NumberColumn("Resp. Media (h)",  format="%.1f"),
         "tempo_medio_processo_h": st.column_config.NumberColumn("Proc. Medio (h)",  format="%.1f"),
-        "n_transferencias_total": st.column_config.NumberColumn("Transfer. Total"),
-        "n_transferencias_medio": st.column_config.NumberColumn("Transfer. / Ticket", format="%.2f"),
     }
-    st.dataframe(df, width='stretch', column_config=col_cfg)
+    df_display = df.drop(columns=[c for c in ["n_transferencias_total", "n_transferencias_medio"] if c in df.columns])
+    st.dataframe(df_display, width='stretch', column_config=col_cfg)
 
 
 # ---------------------------------------------------------------------------
