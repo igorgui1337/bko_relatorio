@@ -479,6 +479,379 @@ def _fig_to_b64(fig) -> str:
     return base64.b64encode(pio.to_image(fig, format="png", scale=2.0)).decode()
 
 
+def _build_html_export(result: dict) -> str:
+    """
+    Gera HTML autocontido com visual identico ao dashboard.
+    Graficos sao interativos (Plotly JS). Ideal para Ctrl+P -> PDF no Chrome.
+    """
+    df_g    = result["geral"]
+    ref     = result["ref_time"]
+    total   = len(df_g)
+    fech    = int((df_g["status"] == "closed").sum())
+    proc    = int((df_g["status"] == "processing").sum())
+    abertos = int((df_g["status"] == "open").sum())
+    alert   = int((df_g["sla_alerta"] == "SIM").sum())
+    sla_p_med  = df_g["tempo_processo_h"].mean()
+    sla_p_max  = df_g["tempo_processo_h"].max()
+    sla_r_med  = df_g["tempo_resposta_h"].mean()
+    pct_alerta = alert / total * 100 if total else 0
+    pct_f = fech / total * 100 if total else 0
+    pct_p = proc / total * 100 if total else 0
+    pct_a = abertos / total * 100 if total else 0
+
+    # ── Gerar divs dos graficos Plotly ────────────────────────────────────
+    _lay = dict(plot_bgcolor="#1e2130", paper_bgcolor="#262730",
+                font=dict(color="#fafafa", family="sans-serif", size=12),
+                bargap=0.22, margin=dict(t=30, b=30, l=10, r=10),
+                legend=dict(bgcolor="rgba(0,0,0,0)"))
+
+    def _chart_div(fig, first=False):
+        return fig.to_html(full_html=False,
+                           include_plotlyjs="cdn" if first else False,
+                           config={"displayModeBar": False, "responsive": True})
+
+    charts = {}
+    _first = [True]
+
+    def _try(key, fn):
+        try:
+            fig = fn()
+            charts[key] = _chart_div(fig, first=_first[0])
+            _first[0] = False
+        except Exception as exc:
+            _log(f"Chart HTML '{key}': {exc}")
+            charts[key] = ""
+
+    def _funil():
+        fig = px.bar(result["funil_m"], y="periodo",
+                     x=["tickets_fechados", "em_processo"],
+                     barmode="group", orientation="h",
+                     color_discrete_map={"tickets_fechados": COR_FECHADO,
+                                         "em_processo": COR_PROCESSO},
+                     labels={"value": "Tickets", "periodo": "", "variable": ""})
+        fig.update_layout(height=320, legend=dict(orientation="h", y=1.08), **_lay)
+        fig.update_traces(textposition="outside", cliponaxis=False, texttemplate="%{x}")
+        return fig
+
+    def _escrit():
+        df_e = result["escrit"].sort_values("total_tickets", ascending=True).tail(15)
+        fig = px.bar(df_e, x="total_tickets", y="escritorio", orientation="h",
+                     color="pct_fechado", color_continuous_scale="RdYlGn",
+                     range_color=[0, 100], text="total_tickets",
+                     labels={"total_tickets": "Tickets", "escritorio": "",
+                             "pct_fechado": "% Fechado"})
+        fig.update_layout(height=420, yaxis=dict(automargin=True), **_lay)
+        fig.update_traces(textposition="outside", cliponaxis=False)
+        return fig
+
+    def _top20():
+        df_sla = result.get("sla_p", pd.DataFrame())
+        if df_sla.empty:
+            raise ValueError("vazio")
+        df_t = df_sla.sort_values("tempo_processo_h", ascending=False).head(20).copy()
+        df_t["label"] = "#" + df_t["ticket_id"].astype(str) + "  " + df_t["ticket_subject"].str.slice(0, 32)
+        df_t["cor"] = df_t["tempo_processo_h"].apply(
+            lambda h: COR_ALERTA if h > 24 else (COR_PROCESSO if h > 10 else COR_FECHADO))
+        fig = px.bar(df_t.sort_values("tempo_processo_h", ascending=True),
+                     x="tempo_processo_h", y="label", orientation="h",
+                     color="cor", color_discrete_map="identity", text_auto=".1f",
+                     labels={"tempo_processo_h": "Horas", "label": ""})
+        fig.update_layout(height=520, showlegend=False,
+                          yaxis=dict(automargin=True), **_lay)
+        fig.update_traces(textposition="outside", cliponaxis=False)
+        return fig
+
+    def _funil_mensal_line():
+        fig = px.bar(result["funil_m"],
+                     x="periodo", y=["tickets_fechados", "em_processo"],
+                     barmode="group",
+                     color_discrete_map={"tickets_fechados": COR_FECHADO,
+                                         "em_processo": COR_PROCESSO},
+                     labels={"value": "Tickets", "periodo": "", "variable": ""})
+        fig.update_layout(height=300, legend=dict(orientation="h", y=1.08), **_lay)
+        return fig
+
+    def _dept():
+        df_d = result.get("depto", pd.DataFrame())
+        if df_d.empty:
+            raise ValueError("vazio")
+        fig = px.bar(df_d.sort_values("total_tickets", ascending=True),
+                     x="total_tickets", y="departamento", orientation="h",
+                     color="pct_fechado", color_continuous_scale="RdYlGn",
+                     range_color=[0, 100], text="total_tickets",
+                     labels={"total_tickets": "Tickets", "departamento": "",
+                             "pct_fechado": "% Fechado"})
+        fig.update_layout(height=320, yaxis=dict(automargin=True), **_lay)
+        fig.update_traces(textposition="outside", cliponaxis=False)
+        return fig
+
+    _try("funil",  _funil)
+    _try("escrit", _escrit)
+    _try("top20",  _top20)
+    _try("funil_v", _funil_mensal_line)
+    _try("dept",   _dept)
+
+    # ── Helpers HTML ──────────────────────────────────────────────────────
+    def kpi(label, value, sub, color):
+        return (f'<div class="kc" style="border-top:4px solid {color}">'
+                f'<div class="kv" style="color:{color}">{value}</div>'
+                f'{"<div class=ks>" + sub + "</div>" if sub else ""}'
+                f'<div class="kl">{label}</div></div>')
+
+    def sec(title, icon=""):
+        return f'<div class="st">{icon} {title}</div>'
+
+    def tbl(df, cols, hdrs, fmts=None):
+        fmts = fmts or {}
+        ths = "".join(f"<th>{h}</th>" for h in hdrs)
+        rows = ""
+        for i, (_, row) in enumerate(df.iterrows()):
+            cls = ' class="z"' if i % 2 == 0 else ""
+            cells = ""
+            for c in cols:
+                v = row.get(c, "")
+                try:
+                    v = fmts[c](v) if c in fmts else (str(v) if pd.notna(v) else "—")
+                except Exception:
+                    v = "—"
+                cells += f"<td>{v}</td>"
+            rows += f"<tr{cls}>{cells}</tr>"
+        return f"<table><thead><tr>{ths}</tr></thead><tbody>{rows}</tbody></table>"
+
+    def chart(key):
+        return f'<div class="chart-wrap">{charts.get(key,"")}</div>' if charts.get(key) else ""
+
+    # ── Tabelas ───────────────────────────────────────────────────────────
+    fmts_f = {"tickets_fechados": lambda v: f"{int(v):,}",
+              "em_processo":      lambda v: f"{int(v):,}",
+              "pct_fechado":      lambda v: f"{v:.1f}%",
+              "tempo_medio_resposta_h": lambda v: f"{v:.1f}h" if pd.notna(v) else "—"}
+
+    fmts_a = {"total":    lambda v: f"{int(v):,}",
+              "fechados": lambda v: f"{int(v):,}",
+              "em_processo": lambda v: f"{int(v):,}",
+              "pct_fechado": lambda v: f"{v:.1f}%",
+              "tempo_medio_resposta_h": lambda v: f"{v:.1f}h" if pd.notna(v) else "—",
+              "assunto": lambda v: str(v)[:60] if pd.notna(v) else "—"}
+
+    fmts_e = {**fmts_a,
+              "total_tickets": lambda v: f"{int(v):,}",
+              "pendentes":     lambda v: f"{int(v):,}",
+              "escritorio":    lambda v: str(v)[:40] if pd.notna(v) else "—"}
+
+    fmts_d = {"total_tickets": lambda v: f"{int(v):,}",
+              "fechados":      lambda v: f"{int(v):,}",
+              "em_processo":   lambda v: f"{int(v):,}",
+              "pct_fechado":   lambda v: f"{v:.1f}%",
+              "tempo_medio_resposta_h": lambda v: f"{v:.1f}h" if pd.notna(v) else "—",
+              "tempo_medio_processo_h": lambda v: f"{v:.1f}h" if pd.notna(v) else "—",
+              "departamento":  lambda v: str(v) if pd.notna(v) else "—"}
+
+    fmts_g = {"tempo_processo_h": lambda v: f"{v:.1f}h" if pd.notna(v) else "—",
+              "tempo_resposta_h": lambda v: f"{v:.1f}h" if pd.notna(v) else "—",
+              "ticket_subject":   lambda v: str(v)[:55] if pd.notna(v) else "—",
+              "analista":         lambda v: str(v)[:30] if pd.notna(v) else "—"}
+
+    tbl_funil   = tbl(result["funil_m"].tail(12),
+                      ["periodo","tickets_fechados","em_processo","pct_fechado","tempo_medio_resposta_h"],
+                      ["Período","Fechados","Em Processo","% Fechado","Resp. Média (h)"], fmts_f)
+
+    tbl_assunto = tbl(result["assunto"].head(20),
+                      ["assunto","total","fechados","em_processo","pct_fechado","tempo_medio_resposta_h"],
+                      ["Assunto","Total","Fechados","Em Proc.","% Fech.","Resp. Média (h)"], fmts_a)
+
+    tbl_escrit  = tbl(result["escrit"].head(20),
+                      ["escritorio","total_tickets","fechados","pendentes","pct_fechado","tempo_medio_resposta_h"],
+                      ["Escritório","Total","Fechados","Pendentes","% Fech.","Resp. Média (h)"], fmts_e)
+
+    df_dept = result.get("depto", pd.DataFrame())
+    tbl_dept = tbl(df_dept,
+                   ["departamento","total_tickets","fechados","em_processo",
+                    "pct_fechado","tempo_medio_resposta_h","tempo_medio_processo_h"],
+                   ["Departamento","Total","Fechados","Em Proc.",
+                    "% Fech.","Resp. Méd (h)","Proc. Méd (h)"], fmts_d) if not df_dept.empty else ""
+
+    df_top50 = (df_g[df_g["status"].isin(["open","processing"])]
+                .sort_values("tempo_processo_h", ascending=False).head(50))
+    tbl_top50 = tbl(df_top50,
+                    ["ticket_id","ticket_subject","status","tempo_processo_h","tempo_resposta_h","analista"],
+                    ["Ticket ID","Assunto","Status","Proc. (h)","Resp. (h)","Analista"], fmts_g)
+
+    sla_items = " &nbsp;|&nbsp; ".join([
+        f"Proc. Médio: <b>{sla_p_med:.1f}h</b>" if pd.notna(sla_p_med) else "Proc. Médio: —",
+        f"Proc. Máximo: <b>{sla_p_max:.1f}h</b>" if pd.notna(sla_p_max) else "Proc. Máx: —",
+        f"Resp. Média: <b>{sla_r_med:.1f}h</b>"  if pd.notna(sla_r_med) else "Resp. Média: —",
+        f"Em Alerta: <b>{pct_alerta:.1f}%</b> dos tickets",
+    ])
+
+    dept_block = f"""
+    <div class="pb"></div>
+    {sec('Resumo por Departamento', '🏬')}
+    {chart('dept')}
+    {tbl_dept}
+    """ if tbl_dept else ""
+
+    # ── HTML completo ──────────────────────────────────────────────────────
+    return f"""<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Relatorio BKO — {ref}</title>
+<style>
+  :root {{
+    --bg:      #0e1117;
+    --card:    #262730;
+    --border:  #3a3d4a;
+    --text:    #fafafa;
+    --muted:   #a0a0b0;
+    --hdr:     #1F3864;
+  }}
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{
+    background: var(--bg); color: var(--text);
+    font-family: "Source Sans Pro", "Segoe UI", Arial, sans-serif;
+    font-size: 14px; line-height: 1.5;
+  }}
+  .container {{ max-width: 1100px; margin: 0 auto; padding: 24px 20px; }}
+  /* Capa */
+  .cover {{
+    background: linear-gradient(135deg, #1F3864 0%, #2c4a8c 100%);
+    border-radius: 10px; padding: 32px 28px 24px;
+    margin-bottom: 24px;
+    display: flex; justify-content: space-between; align-items: flex-end;
+  }}
+  .cover h1 {{ font-size: 2.2rem; font-weight: 700; letter-spacing: -0.5px; }}
+  .cover h2 {{ font-size: 1.1rem; font-weight: 400; opacity: .8; margin-top: 4px; }}
+  .cover .ref {{ font-size: 0.82rem; color: #90b8ff; margin-top: 8px; }}
+  .cover .badge {{
+    background: rgba(255,255,255,.12); border-radius: 20px;
+    padding: 6px 16px; font-size: 0.85rem; color: #cde;
+  }}
+  /* KPI grid */
+  .kg {{
+    display: grid; grid-template-columns: repeat(5,1fr);
+    gap: 12px; margin-bottom: 16px;
+  }}
+  .kc {{
+    background: var(--card); border-radius: 8px;
+    padding: 14px 10px 10px; text-align: center;
+    border-top: 4px solid; box-shadow: 0 2px 8px rgba(0,0,0,.3);
+  }}
+  .kv {{ font-size: 1.9rem; font-weight: 700; line-height: 1.1; }}
+  .ks {{ font-size: 0.72rem; color: var(--muted); margin: 3px 0; }}
+  .kl {{ font-size: 0.75rem; color: #ccc; font-weight: 600; margin-top: 4px; }}
+  /* SLA bar */
+  .sb {{
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 14px; font-size: 0.82rem;
+    color: var(--muted); margin-bottom: 20px;
+  }}
+  /* Section title */
+  .st {{
+    background: #2c3e50; color: #fff;
+    padding: 7px 14px; font-size: 1rem; font-weight: 700;
+    border-radius: 6px; margin: 24px 0 10px;
+  }}
+  /* Tables */
+  table {{ width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-bottom: 16px; }}
+  thead th {{
+    background: var(--hdr); color: #fff;
+    padding: 7px 8px; text-align: left; font-weight: 600;
+  }}
+  tbody tr.z {{ background: rgba(255,255,255,.04); }}
+  tbody td {{ padding: 5px 8px; border-bottom: 1px solid var(--border); }}
+  /* Charts */
+  .chart-wrap {{
+    background: var(--card); border-radius: 8px; padding: 4px;
+    margin-bottom: 16px; overflow: hidden;
+  }}
+  .chart-wrap > div {{ width: 100% !important; }}
+  /* Page break */
+  .pb {{ page-break-before: always; margin-top: 8px; }}
+  /* Print instructions banner */
+  .print-tip {{
+    background: #1a3a1a; border: 1px solid #2a6a2a; border-radius: 6px;
+    padding: 10px 16px; margin-bottom: 20px; font-size: 0.85rem;
+    color: #aeffae;
+  }}
+  .print-tip b {{ color: #7fff7f; }}
+  /* Print CSS */
+  @media print {{
+    body {{ background: white !important; color: #111 !important; font-size: 10pt; }}
+    .container {{ padding: 0; max-width: 100%; }}
+    .cover {{ background: #1F3864 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+    .kc {{ background: #f5f5f5 !important; box-shadow: none !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+    .kv {{ font-size: 1.5rem !important; }}
+    .st {{ background: #2c3e50 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+    thead th {{ background: #1F3864 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+    .sb {{ background: #eef2f7 !important; color: #333 !important; }}
+    tbody tr.z {{ background: #f5f7fa !important; }}
+    tbody td {{ color: #111 !important; }}
+    .print-tip {{ display: none; }}
+    .pb {{ page-break-before: always; }}
+    .chart-wrap {{ background: white !important; box-shadow: none !important; }}
+    table {{ font-size: 8pt; }}
+  }}
+  @page {{ margin: 12mm 12mm 16mm; }}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="print-tip">
+    💡 <b>Como salvar como PDF:</b> Ctrl+P (ou ⌘+P no Mac) → Destino: <b>Salvar como PDF</b>
+    → Mais configurações → Gráficos de fundo: ✅ ativado → Salvar
+  </div>
+
+  <div class="cover">
+    <div>
+      <h1>Relatorio BKO</h1>
+      <h2>Dashboard de Tickets</h2>
+      <div class="ref">Gerado em {ref}</div>
+    </div>
+    <div class="badge">📊 {total:,} tickets</div>
+  </div>
+
+  <div class="kg">
+    {kpi("Total de Tickets",  f"{total:,}",    "",                                    COR_PRINCIPAL)}
+    {kpi("Fechados",          f"{fech:,}",     f"{pct_f:.1f}% do total",              COR_FECHADO)}
+    {kpi("Em Processamento",  f"{proc:,}",     f"{pct_p:.1f}% do total",              COR_PROCESSO)}
+    {kpi("Abertos",           f"{abertos:,}",  f"{pct_a:.1f}% do total",              COR_ABERTO)}
+    {kpi("SLA Alerta &gt;24h",f"{alert:,}",    f"{pct_alerta:.1f}% do total",         COR_ALERTA)}
+  </div>
+  <div class="sb">{sla_items}</div>
+
+  {sec('Funil Mensal', '📊')}
+  {chart('funil_v')}
+  {tbl_funil}
+
+  <div class="pb"></div>
+  {sec('Top 15 Assuntos por Volume', '🏷')}
+  {tbl_assunto}
+
+  {sec('Top 15 Escritórios por Volume', '🏢')}
+  {chart('escrit')}
+  {tbl_escrit}
+
+  <div class="pb"></div>
+  {sec('Top 20 Tickets com Maior Tempo em Espera', '⏱')}
+  {chart('top20')}
+
+  {dept_block}
+
+  <div class="pb"></div>
+  {sec('Top 50 Tickets Ativos por Urgência', '🚨')}
+  <p style="font-size:.78rem;color:var(--muted);margin-bottom:8px">
+    Tickets abertos ou em processamento, ordenados por tempo em aberto.
+  </p>
+  {tbl_top50}
+
+</div>
+</body>
+</html>"""
+
+
 def _html_to_pdf(html: str) -> bytes:
     """Converte HTML para PDF. Tenta WeasyPrint (Linux/Cloud); cai para xhtml2pdf se disponivel."""
     try:
@@ -1587,6 +1960,17 @@ def main():
                     )
                 else:
                     st.caption("PDF indisponivel — verifique os logs.")
+
+                _hk = f"html_{uploaded.file_id}"
+                if _hk not in st.session_state:
+                    st.session_state[_hk] = _build_html_export(_res).encode("utf-8")
+                st.download_button(
+                    label="🌐 Exportar HTML (abrir no Chrome → Ctrl+P)",
+                    data=st.session_state[_hk],
+                    file_name=f"relatorio_bko_{datetime.now().strftime('%Y%m%d_%H%M')}.html",
+                    mime="text/html",
+                    width='stretch',
+                )
 
                 st.markdown("---")
                 st.markdown("#### 📧 Enviar por E-mail")
