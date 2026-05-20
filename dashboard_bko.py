@@ -130,6 +130,16 @@ def executar_pipeline(file_bytes: bytes, file_ext: str, status_ui) -> dict:
     df_geral = prd.consolidate(df_raw)
     _log(f"Consolidacao OK | tickets={len(df_geral):,} | status={df_geral['status'].value_counts().to_dict()}")
 
+    # Cruzar com Departamentos.xlsx (opcional — se o arquivo existir)
+    _dept_path = Path(__file__).parent / "Departamentos.xlsx"
+    df_dept = prd.load_departamentos(_dept_path)
+    if df_dept is not None:
+        df_geral = df_geral.merge(df_dept, on="ticket_subject", how="left")
+        df_geral["departamento"] = df_geral["departamento"].fillna("Sem Departamento")
+        _log(f"Departamentos cruzados | {df_geral['departamento'].nunique()} departamentos")
+    else:
+        _log("Departamentos.xlsx nao encontrado — aba de departamento sera omitida")
+
     # ── Etapa 5: analises ───────────────────────────────────────────────
     status_ui.update(label="[5/6] Calculando SLAs, funil e agrupamentos...")
     _log("Calculando analises...")
@@ -146,7 +156,8 @@ def executar_pipeline(file_bytes: bytes, file_ext: str, status_ui) -> dict:
 
     df_assunto = prd.make_por_assunto(df_geral)
     df_escrit  = prd.make_por_escritorio(df_geral)
-    _log(f"Agrupamentos OK | {len(df_assunto)} assuntos / {len(df_escrit)} escritorios")
+    df_depto   = prd.make_por_departamento(df_geral)
+    _log(f"Agrupamentos OK | {len(df_assunto)} assuntos / {len(df_escrit)} escritorios / {len(df_depto)} departamentos")
 
     # ── Etapa 6: gera XLSX ──────────────────────────────────────────────
     status_ui.update(label="[6/6] Gerando XLSX para download...")
@@ -155,15 +166,19 @@ def executar_pipeline(file_bytes: bytes, file_ext: str, status_ui) -> dict:
     with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmp:
         xlsx_path = Path(tmp.name)
 
-    prd.write_xlsx(str(xlsx_path), {
-        "Aba_Geral":       df_geral,
-        "SLA_Em_Processo": df_sla_p,
-        "SLA_Resposta":    df_sla_r,
-        "Funil_Mensal":    df_funil_m,
-        "Funil_Semanal":   df_funil_s,
-        "Por_Assunto":     df_assunto,
-        "Por_Escritorio":  df_escrit,
-    })
+    sheets = {
+        "Aba_Geral":         df_geral,
+        "SLA_Em_Processo":   df_sla_p,
+        "SLA_Resposta":      df_sla_r,
+        "Funil_Mensal":      df_funil_m,
+        "Funil_Semanal":     df_funil_s,
+        "Por_Assunto":       df_assunto,
+        "Por_Escritorio":    df_escrit,
+    }
+    if len(df_depto) > 0:
+        sheets["Por_Departamento"] = df_depto
+
+    prd.write_xlsx(str(xlsx_path), sheets)
     xlsx_bytes = xlsx_path.read_bytes()
     xlsx_path.unlink(missing_ok=True)
     _log(f"XLSX OK | {len(xlsx_bytes):,} bytes")
@@ -180,6 +195,7 @@ def executar_pipeline(file_bytes: bytes, file_ext: str, status_ui) -> dict:
         "funil_s":      df_funil_s,
         "assunto":      df_assunto,
         "escrit":       df_escrit,
+        "depto":        df_depto,
         "xlsx":         xlsx_bytes,
         "ref_time":     prd.AGORA.strftime("%d/%m/%Y %H:%M"),
     }
@@ -1131,6 +1147,80 @@ def tab_por_escritorio(df: pd.DataFrame):
     st.dataframe(df, width='stretch', column_config=col_cfg)
 
 
+# ---- Por Departamento ----
+
+def tab_por_departamento(df: pd.DataFrame):
+    if df.empty:
+        st.info("Arquivo Departamentos.xlsx não encontrado ou sem dados para cruzar.")
+        return
+
+    st.subheader(f"Distribuicao por Departamento — {len(df)} departamentos")
+
+    col_vol, col_resp = st.columns(2)
+
+    with col_vol:
+        fig_v = px.bar(
+            df.sort_values("total_tickets", ascending=True),
+            x="total_tickets",
+            y="departamento",
+            orientation="h",
+            title="Volume de Tickets por Departamento",
+            labels={"total_tickets": "Total", "departamento": ""},
+            color="pct_fechado",
+            color_continuous_scale="RdYlGn",
+            range_color=[0, 100],
+            text="total_tickets",
+        )
+        fig_v.update_traces(textposition="outside", cliponaxis=False)
+        fig_v.update_layout(coloraxis_colorbar_title="% Fechado",
+                            margin=dict(t=40, b=20, r=60))
+        st.plotly_chart(fig_v, width='stretch')
+
+    with col_resp:
+        fig_r = px.bar(
+            df.sort_values("tempo_medio_resposta_h", ascending=True),
+            x="tempo_medio_resposta_h",
+            y="departamento",
+            orientation="h",
+            title="Tempo Medio de Resposta (h) por Departamento",
+            labels={"tempo_medio_resposta_h": "Horas", "departamento": ""},
+            color_discrete_sequence=[COR_PROCESSO],
+            text_auto=".1f",
+        )
+        fig_r.update_traces(textposition="outside", cliponaxis=False)
+        fig_r.update_layout(margin=dict(t=40, b=20, r=60))
+        st.plotly_chart(fig_r, width='stretch')
+
+    # Fechados vs Em Processo
+    fig_comp = px.bar(
+        df.sort_values("fechados", ascending=True),
+        x=["fechados", "em_processo"],
+        y="departamento",
+        orientation="h",
+        barmode="group",
+        title="Fechados vs Em Processo por Departamento",
+        labels={"value": "Qtd", "departamento": "", "variable": ""},
+        color_discrete_map={"fechados": COR_FECHADO, "em_processo": COR_PROCESSO},
+        text_auto=True,
+    )
+    fig_comp.update_traces(textposition="outside", cliponaxis=False)
+    fig_comp.update_layout(legend_title_text="", margin=dict(t=40, b=20, r=60))
+    st.plotly_chart(fig_comp, width='stretch')
+
+    st.subheader("Tabela por Departamento")
+    col_cfg = {
+        "departamento":          st.column_config.TextColumn("Departamento", width="medium"),
+        "total_tickets":         st.column_config.NumberColumn("Total"),
+        "fechados":              st.column_config.NumberColumn("Fechados"),
+        "em_processo":           st.column_config.NumberColumn("Em Processo"),
+        "pct_fechado":           st.column_config.NumberColumn("% Fechado",      format="%.1f%%"),
+        "com_sla_alerta":        st.column_config.NumberColumn("SLA Alerta"),
+        "tempo_medio_resposta_h":st.column_config.NumberColumn("Resp. Media (h)", format="%.1f"),
+        "tempo_medio_processo_h":st.column_config.NumberColumn("Proc. Medio (h)", format="%.1f"),
+    }
+    st.dataframe(df, width='stretch', column_config=col_cfg)
+
+
 # ---------------------------------------------------------------------------
 # Tela de boas-vindas
 # ---------------------------------------------------------------------------
@@ -1290,13 +1380,14 @@ def main():
     st.markdown("---")
 
     # Abas
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
         "📋 Aba Geral",
         "⏱ SLA Em Processo",
         "📨 SLA Resposta",
         "📊 Funil",
         "🏷 Por Assunto",
         "🏢 Por Escritorio",
+        "🏬 Por Departamento",
     ])
 
     with tab1:
@@ -1316,6 +1407,9 @@ def main():
 
     with tab6:
         tab_por_escritorio(result["escrit"])
+
+    with tab7:
+        tab_por_departamento(result["depto"])
 
 
 if __name__ == "__main__":

@@ -283,6 +283,47 @@ def make_por_assunto(df: pd.DataFrame) -> pd.DataFrame:
     return grouped.sort_values("total", ascending=False).reset_index(drop=True)
 
 
+def load_departamentos(path) -> pd.DataFrame | None:
+    """Carrega Departamentos.xlsx e retorna mapeamento ticket_subject -> departamento."""
+    p = Path(path)
+    if not p.exists():
+        return None
+    df = pd.read_excel(p, dtype=str)
+    df.columns = [c.strip() for c in df.columns]
+    if "ticket_subject" not in df.columns or "Departamento" not in df.columns:
+        return None
+    df = df[["ticket_subject", "Departamento"]].copy()
+    df["ticket_subject"] = df["ticket_subject"].str.strip()
+    df["Departamento"]   = df["Departamento"].str.strip()
+    df = df.dropna().drop_duplicates("ticket_subject")
+    df = df.rename(columns={"Departamento": "departamento"})
+    return df
+
+
+def make_por_departamento(df: pd.DataFrame) -> pd.DataFrame:
+    """Agrupamento por departamento (requer coluna 'departamento' no df_geral)."""
+    if "departamento" not in df.columns:
+        return pd.DataFrame()
+    grouped = df.groupby("departamento").agg(
+        total_tickets          =("ticket_id",       "count"),
+        fechados               =("status",           lambda s: (s == "closed").sum()),
+        em_processo            =("status",           lambda s: s.isin(["open", "processing"]).sum()),
+        com_sla_alerta         =("sla_alerta",       lambda s: (s == "SIM").sum()),
+        tempo_medio_resposta_h =("tempo_resposta_h", "mean"),
+        tempo_medio_processo_h =("tempo_processo_h", "mean"),
+    ).reset_index()
+    grouped["pct_fechado"]            = (grouped["fechados"] / grouped["total_tickets"] * 100).round(1)
+    grouped["tempo_medio_resposta_h"] = grouped["tempo_medio_resposta_h"].round(2)
+    grouped["tempo_medio_processo_h"] = grouped["tempo_medio_processo_h"].round(2)
+    col_order = [
+        "departamento", "total_tickets",
+        "fechados", "em_processo", "pct_fechado",
+        "com_sla_alerta",
+        "tempo_medio_resposta_h", "tempo_medio_processo_h",
+    ]
+    return grouped[col_order].sort_values("total_tickets", ascending=False).reset_index(drop=True)
+
+
 def make_por_escritorio(df: pd.DataFrame) -> pd.DataFrame:
     grouped = df.groupby("escritorio").agg(
         total_tickets            =("ticket_id",       "count"),
