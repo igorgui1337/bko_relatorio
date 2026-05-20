@@ -1961,17 +1961,6 @@ def main():
                     width='stretch',
                 )
 
-                if _pdf:
-                    st.download_button(
-                        label="📄 Baixar PDF",
-                        data=_pdf,
-                        file_name=f"relatorio_bko_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
-                        mime="application/pdf",
-                        width='stretch',
-                    )
-                else:
-                    st.caption("PDF indisponivel — verifique os logs.")
-
                 _hk = f"html_{uploaded.file_id}"
                 if _hk not in st.session_state:
                     st.session_state[_hk] = _build_html_export(_res).encode("utf-8")
