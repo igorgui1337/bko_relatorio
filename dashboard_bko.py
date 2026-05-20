@@ -334,6 +334,7 @@ def _pdf_add_charts(pdf, result: dict) -> None:
     try:
         import plotly.io as pio
 
+        # Funil mensal
         df_m = result["funil_m"]
         fig1 = px.bar(
             df_m, y="periodo",
@@ -351,6 +352,7 @@ def _pdf_add_charts(pdf, result: dict) -> None:
         fig1.update_traces(textposition="outside", cliponaxis=False,
                            texttemplate="%{x}")
 
+        # Volume por escritorio
         df_e = result["escrit"].sort_values("total_tickets", ascending=True).tail(15)
         fig2 = px.bar(
             df_e, x="total_tickets", y="escritorio", orientation="h",
@@ -369,6 +371,47 @@ def _pdf_add_charts(pdf, result: dict) -> None:
             ("Distribuicao por Escritorio", fig2),
         ]
 
+        # Top 20 tickets em espera (SLA Em Processo)
+        df_sla = result.get("sla_p", pd.DataFrame())
+        if not df_sla.empty and "tempo_processo_h" in df_sla.columns:
+            df_top = df_sla.sort_values("tempo_processo_h", ascending=False).head(20).copy()
+            df_top["label"] = df_top["ticket_id"].astype(str) + " — " + df_top.get("ticket_subject", df_top["ticket_id"].astype(str)).str.slice(0, 30)
+            df_top["cor"] = df_top["tempo_processo_h"].apply(
+                lambda h: "#D62728" if h > 24 else ("#FF7F0E" if h > 10 else "#2CA02C")
+            )
+            fig3 = px.bar(
+                df_top.sort_values("tempo_processo_h", ascending=True),
+                x="tempo_processo_h", y="label", orientation="h",
+                title="Top 20 Tickets com Maior Tempo em Espera (horas)",
+                labels={"tempo_processo_h": "Horas", "label": ""},
+                color="cor",
+                color_discrete_map="identity",
+                text_auto=".1f",
+            )
+            fig3.update_layout(height=480, width=720, margin=dict(t=50, b=30),
+                               plot_bgcolor="white", paper_bgcolor="white",
+                               showlegend=False)
+            fig3.update_traces(textposition="outside", cliponaxis=False)
+            charts.append(("Top 20 Tickets em Espera", fig3))
+
+        # Volume por departamento
+        df_dept = result.get("depto", pd.DataFrame())
+        if not df_dept.empty and "departamento" in df_dept.columns:
+            fig4 = px.bar(
+                df_dept.sort_values("total_tickets", ascending=True),
+                x="total_tickets", y="departamento", orientation="h",
+                title="Volume de Tickets por Departamento",
+                labels={"total_tickets": "Total", "departamento": ""},
+                color="pct_fechado",
+                color_continuous_scale="RdYlGn", range_color=[0, 100],
+                text="total_tickets",
+            )
+            fig4.update_layout(height=400, width=720, margin=dict(t=50, b=30),
+                               plot_bgcolor="white", paper_bgcolor="white",
+                               coloraxis_colorbar_title="% Fechado")
+            fig4.update_traces(textposition="outside", cliponaxis=False)
+            charts.append(("Volume por Departamento", fig4))
+
         pdf.add_page()
         _section_title(pdf, "Graficos")
 
@@ -378,6 +421,9 @@ def _pdf_add_charts(pdf, result: dict) -> None:
                 tmp.write(img_bytes)
                 tmp_path = tmp.name
             try:
+                # Nova pagina se nao ha espaco suficiente
+                if pdf.get_y() > pdf.h - 90:
+                    pdf.add_page()
                 pdf.set_font("Helvetica", "B", 9)
                 pdf.set_text_color(60, 60, 60)
                 pdf.cell(0, 6, text=title_fig, new_x="LMARGIN", new_y="NEXT")
@@ -516,7 +562,60 @@ def _build_pdf(result: dict) -> bytes:
             resp,
         ], wids_e, i, alns_e)
 
-    # ─── Pagina 3: Graficos (se kaleido disponivel) ────────────────────────
+    # ─── Pagina 3: Por Departamento + Aba Geral ───────────────────────────
+    df_dept = result.get("depto", pd.DataFrame())
+    if not df_dept.empty:
+        pdf.add_page()
+        _section_title(pdf, "Resumo por Departamento")
+        heads_d = ["Departamento", "Total", "Fechados", "Em Proc.", "% Fech.", "Resp. Med (h)", "Proc. Med (h)"]
+        wids_d  = [45, 18, 22, 22, 20, 30, 30]
+        alns_d  = ["L", "R", "R", "R", "R", "R", "R"]
+        _pdf_table_header(pdf, heads_d, wids_d, alns_d)
+        for i, (_, row) in enumerate(df_dept.iterrows()):
+            resp = f"{row['tempo_medio_resposta_h']:.1f}" if pd.notna(row.get("tempo_medio_resposta_h")) else "-"
+            proc = f"{row['tempo_medio_processo_h']:.1f}" if pd.notna(row.get("tempo_medio_processo_h")) else "-"
+            _pdf_table_row(pdf, [
+                _trunc(str(row["departamento"]), 26),
+                f"{int(row['total_tickets']):,}",
+                f"{int(row['fechados']):,}",
+                f"{int(row['em_processo']):,}",
+                f"{row['pct_fechado']:.1f}%",
+                resp,
+                proc,
+            ], wids_d, i, alns_d)
+
+    # Aba Geral — Top 50 tickets por tempo em processo
+    pdf.add_page()
+    _section_title(pdf, "Top 50 Tickets por Tempo em Processo")
+    pdf.set_font("Helvetica", "I", 7)
+    pdf.set_text_color(120, 120, 120)
+    pdf.cell(0, 5, text="Tickets ativos com maior tempo em aberto, ordenados por urgencia.",
+             new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(2)
+    pdf.set_text_color(0, 0, 0)
+
+    df_top50 = (
+        df_g[df_g["status"].isin(["open", "processing"])]
+        .sort_values("tempo_processo_h", ascending=False)
+        .head(50)
+    )
+    heads_g = ["Ticket ID", "Assunto", "Status", "Proc. (h)", "Resp. (h)", "Analista"]
+    wids_g  = [22, 60, 22, 20, 20, 36]
+    alns_g  = ["C", "L", "C", "R", "R", "L"]
+    _pdf_table_header(pdf, heads_g, wids_g, alns_g)
+    for i, (_, row) in enumerate(df_top50.iterrows()):
+        proc = f"{row['tempo_processo_h']:.1f}" if pd.notna(row.get("tempo_processo_h")) else "-"
+        resp = f"{row['tempo_resposta_h']:.1f}"  if pd.notna(row.get("tempo_resposta_h"))  else "-"
+        _pdf_table_row(pdf, [
+            str(row.get("ticket_id", "-")),
+            _trunc(str(row.get("ticket_subject", "-")), 34),
+            str(row.get("status", "-")),
+            proc,
+            resp,
+            _trunc(str(row.get("analista", "-")), 20),
+        ], wids_g, i, alns_g)
+
+    # ─── Graficos (se kaleido disponivel) ─────────────────────────────────
     _pdf_add_charts(pdf, result)
 
     return bytes(pdf.output())
