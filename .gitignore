@@ -2,6 +2,8 @@
 *.csv
 *.xlsx
 *.xls
+# Excecao: arquivos de referencia que devem ficar no repositorio
+!Departamentos.xlsx
 
 # Python
 __pycache__/
