@@ -304,14 +304,19 @@ def make_por_departamento(df: pd.DataFrame) -> pd.DataFrame:
     """Agrupamento por departamento (requer coluna 'departamento' no df_geral)."""
     if "departamento" not in df.columns:
         return pd.DataFrame()
-    grouped = df.groupby("departamento").agg(
+    agg_dict = dict(
         total_tickets          =("ticket_id",       "count"),
         fechados               =("status",           lambda s: (s == "closed").sum()),
         em_processo            =("status",           lambda s: s.isin(["open", "processing"]).sum()),
         com_sla_alerta         =("sla_alerta",       lambda s: (s == "SIM").sum()),
         tempo_medio_resposta_h =("tempo_resposta_h", "mean"),
         tempo_medio_processo_h =("tempo_processo_h", "mean"),
-    ).reset_index()
+    )
+    if "n_transferencias" in df.columns:
+        agg_dict["n_transferencias_total"] = ("n_transferencias", "sum")
+        agg_dict["n_transferencias_medio"] = ("n_transferencias", "mean")
+
+    grouped = df.groupby("departamento").agg(**agg_dict).reset_index()
     grouped["pct_fechado"]            = (grouped["fechados"] / grouped["total_tickets"] * 100).round(1)
     grouped["tempo_medio_resposta_h"] = grouped["tempo_medio_resposta_h"].round(2)
     grouped["tempo_medio_processo_h"] = grouped["tempo_medio_processo_h"].round(2)
@@ -321,6 +326,10 @@ def make_por_departamento(df: pd.DataFrame) -> pd.DataFrame:
         "com_sla_alerta",
         "tempo_medio_resposta_h", "tempo_medio_processo_h",
     ]
+    if "n_transferencias_total" in grouped.columns:
+        grouped["n_transferencias_total"] = grouped["n_transferencias_total"].astype(int)
+        grouped["n_transferencias_medio"] = grouped["n_transferencias_medio"].round(2)
+        col_order += ["n_transferencias_total", "n_transferencias_medio"]
     return grouped[col_order].sort_values("total_tickets", ascending=False).reset_index(drop=True)
 
 
