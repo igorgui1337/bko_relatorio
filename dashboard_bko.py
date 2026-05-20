@@ -748,17 +748,31 @@ def tab_sla_processo(df: pd.DataFrame):
     col_graf, col_escrit = st.columns(2)
 
     with col_graf:
-        fig = px.histogram(
-            df,
+        df_top20 = df.head(20).copy()
+        df_top20["label"] = df_top20["ticket_id"].astype(str) + " — " + df_top20["ticket_subject"].str[:30]
+        df_top20["cor"] = df_top20["sla_alerta"].map({"SIM": COR_ALERTA}).fillna(COR_PROCESSO)
+        df_top20["tempo_fmt"] = df_top20["tempo_processo_h"].apply(_fmt_h)
+
+        fig = px.bar(
+            df_top20.iloc[::-1],
             x="tempo_processo_h",
-            nbins=30,
-            title="Distribuicao do Tempo em Processo (h)",
-            labels={"tempo_processo_h": "Horas"},
-            color_discrete_sequence=[COR_PROCESSO],
+            y="label",
+            orientation="h",
+            title="Top 20 Tickets com Mais Tempo em Espera",
+            labels={"tempo_processo_h": "Horas em Espera", "label": ""},
+            color="cor",
+            color_discrete_map="identity",
+            text="tempo_fmt",
         )
         fig.add_vline(x=prd.SLA_ALERTA_H, line_dash="dash", line_color=COR_ALERTA,
-                      annotation_text=f"{prd.SLA_ALERTA_H}h (alerta)", annotation_position="top right")
-        fig.update_layout(margin=dict(t=40, b=20))
+                      annotation_text=f"{prd.SLA_ALERTA_H}h", annotation_position="top right")
+        fig.update_traces(textposition="outside", cliponaxis=False)
+        fig.update_layout(
+            margin=dict(t=40, b=20, r=80),
+            showlegend=False,
+            height=480,
+            yaxis=dict(tickfont=dict(size=11)),
+        )
         st.plotly_chart(fig, width='stretch')
 
     with col_escrit:
