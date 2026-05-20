@@ -1173,15 +1173,15 @@ tbody td {{ padding: 4px 6px; border-bottom: 1px solid #e2e8f0; }}
     return _html_to_pdf(html)
 
 
-def _enviar_email(destinatario: str, xlsx_bytes: bytes, ref_time: str) -> None:
-    """Envia XLSX por e-mail usando credenciais configuradas nos Streamlit Secrets."""
+def _enviar_email(destinatario: str, xlsx_bytes: bytes, ref_time: str,
+                  html_bytes: bytes | None = None) -> None:
+    """Envia XLSX (+ HTML opcional) por e-mail via SMTP."""
     import smtplib
     from email import encoders as enc_mod
     from email.mime.base import MIMEBase
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
 
-    # Prioridade: Streamlit Secrets (Cloud) → variáveis de ambiente do .env (local)
     cfg       = st.secrets.get("email", {})
     smtp_host = cfg.get("smtp_host") or os.getenv("EMAIL_SMTP_HOST", "smtp.gmail.com")
     smtp_port = int(cfg.get("smtp_port") or os.getenv("EMAIL_SMTP_PORT", "587"))
@@ -1206,28 +1206,39 @@ def _enviar_email(destinatario: str, xlsx_bytes: bytes, ref_time: str) -> None:
     msg["To"]      = destinatario
     msg["Subject"] = f"Relatorio BKO - Tickets ({ref_time})"
 
+    anexos = "  - relatorio_bko.xlsx  (dados completos em planilha)\n"
+    if html_bytes:
+        anexos += "  - relatorio_bko.html (dashboard interativo — abra no Chrome para visualizar ou imprimir como PDF)\n"
+
     body = (
         f"Ola,\n\n"
         f"Segue em anexo o relatorio de tickets BKO gerado em {ref_time}.\n\n"
-        "O arquivo XLSX contem:\n"
-        "  - Aba Geral: todos os tickets consolidados\n"
-        "  - SLA Em Processo: tickets ativos por tempo em aberto\n"
-        "  - SLA Resposta: tempo de resposta BO > BP\n"
-        "  - Funil Mensal e Semanal\n"
-        "  - Por Assunto e Por Escritorio\n\n"
+        f"Anexos:\n{anexos}\n"
+        "Para gerar PDF a partir do HTML: abra o arquivo no Chrome → Ctrl+P → Salvar como PDF.\n\n"
         "Atenciosamente,\n"
         "Dashboard BKO"
     )
     msg.attach(MIMEText(body, "plain", "utf-8"))
 
     safe_ref = ref_time.replace("/", "").replace(":", "").replace(" ", "_")
-    fname    = f"relatorio_bko_{safe_ref}.xlsx"
-    part     = MIMEBase("application",
-                        "vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    part.set_payload(xlsx_bytes)
-    enc_mod.encode_base64(part)
-    part.add_header("Content-Disposition", "attachment", filename=fname)
-    msg.attach(part)
+
+    # Anexo XLSX
+    part_xlsx = MIMEBase("application",
+                         "vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    part_xlsx.set_payload(xlsx_bytes)
+    enc_mod.encode_base64(part_xlsx)
+    part_xlsx.add_header("Content-Disposition", "attachment",
+                         filename=f"relatorio_bko_{safe_ref}.xlsx")
+    msg.attach(part_xlsx)
+
+    # Anexo HTML (opcional)
+    if html_bytes:
+        part_html = MIMEBase("text", "html")
+        part_html.set_payload(html_bytes)
+        enc_mod.encode_base64(part_html)
+        part_html.add_header("Content-Disposition", "attachment",
+                              filename=f"relatorio_bko_{safe_ref}.html")
+        msg.attach(part_html)
 
     with smtplib.SMTP(smtp_host, smtp_port) as server:
         server.ehlo()
@@ -1986,7 +1997,10 @@ def main():
                         _ph = st.empty()
                         _ph.info(f"Enviando para {dest}...")
                         try:
-                            _enviar_email(dest, _res["xlsx"], _res["ref_time"])
+                            _hk_email = f"html_{uploaded.file_id}"
+                            _html_bytes = st.session_state.get(_hk_email)
+                            _enviar_email(dest, _res["xlsx"], _res["ref_time"],
+                                          html_bytes=_html_bytes)
                             _ph.success(f"E-mail enviado para **{dest}**!")
                         except Exception as e_mail:
                             _ph.error(str(e_mail))
