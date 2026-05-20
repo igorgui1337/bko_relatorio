@@ -378,10 +378,11 @@ def _build_pdf(result: dict) -> bytes:
     """Gera PDF com capa, KPIs, resumo SLA, tabelas e graficos."""
     df_g   = result["geral"]
     ref    = result["ref_time"]
-    total  = len(df_g)
-    fech   = int((df_g["status"] == "closed").sum())
-    proc   = int(df_g["status"].isin(["open", "processing"]).sum())
-    alert  = int((df_g["sla_alerta"] == "SIM").sum())
+    total   = len(df_g)
+    fech    = int((df_g["status"] == "closed").sum())
+    proc    = int((df_g["status"] == "processing").sum())
+    abertos = int((df_g["status"] == "open").sum())
+    alert   = int((df_g["sla_alerta"] == "SIM").sum())
 
     sla_p_med  = df_g["tempo_processo_h"].mean()
     sla_p_max  = df_g["tempo_processo_h"].max()
@@ -415,10 +416,11 @@ def _build_pdf(result: dict) -> bytes:
 
     # Cards KPI
     kpis = [
-        ("Total de Tickets", f"{total:,}",  "",                           "1F3864"),
-        ("Fechados",          f"{fech:,}",  f"{fech/total*100:.1f}% do total", "2CA02C"),
-        ("Em Processo",       f"{proc:,}",  f"{proc/total*100:.1f}% do total", "FF7F0E"),
-        ("SLA Alerta >24h",   f"{alert:,}", f"{pct_alerta:.1f}% do total",     "D62728"),
+        ("Total de Tickets",  f"{total:,}",    "",                                    "1F3864"),
+        ("Fechados",          f"{fech:,}",     f"{fech/total*100:.1f}% do total",     "2CA02C"),
+        ("Em Processamento",  f"{proc:,}",     f"{proc/total*100:.1f}% do total",     "FF7F0E"),
+        ("Abertos",           f"{abertos:,}",  f"{abertos/total*100:.1f}% do total",  "1F77B4"),
+        ("SLA Alerta >24h",   f"{alert:,}",    f"{pct_alerta:.1f}% do total",         "D62728"),
     ]
     _pdf_kpi_row(pdf, kpis)
     pdf.ln(3)
@@ -590,7 +592,7 @@ def _fmt_h(h) -> str:
 def big_numbers(df: pd.DataFrame):
     total      = len(df)
     fechados   = (df["status"] == "closed").sum()
-    em_proc    = df["status"].isin(["open", "processing"]).sum()
+    em_proc    = (df["status"] == "processing").sum()
     abertos    = (df["status"] == "open").sum()
     alertas    = (df["sla_alerta"] == "SIM").sum()
 
@@ -598,10 +600,10 @@ def big_numbers(df: pd.DataFrame):
     c1.metric("Total de Tickets", f"{total:,}")
     c2.metric("Fechados",         f"{fechados:,}",
               delta=f"{fechados/total*100:.1f}%")
-    c3.metric("Em Processo",      f"{em_proc:,}",
+    c3.metric("Em Processamento", f"{em_proc:,}",
               delta=f"{em_proc/total*100:.1f}%",   delta_color="inverse")
     c4.metric("Abertos",          f"{abertos:,}",
-              delta_color="inverse")
+              delta=f"{abertos/total*100:.1f}%",   delta_color="inverse")
     c5.metric("SLA Alerta >24h",  f"{alertas:,}",
               delta_color="inverse")
 
