@@ -1409,7 +1409,7 @@ def main():
         tab_por_escritorio(result["escrit"])
 
     with tab7:
-        tab_por_departamento(result["depto"])
+        tab_por_departamento(result.get("depto", pd.DataFrame()))
 
 
 if __name__ == "__main__":
