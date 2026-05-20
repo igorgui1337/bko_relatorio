@@ -473,189 +473,296 @@ def _pdf_add_charts(pdf, result: dict) -> None:
         _log(f"Graficos no PDF ignorados: {exc}")
 
 
+def _fig_to_b64(fig) -> str:
+    """Exporta figura Plotly como PNG base64 para embed em HTML."""
+    import plotly.io as pio, base64
+    return base64.b64encode(pio.to_image(fig, format="png", scale=2.0)).decode()
+
+
+def _html_to_pdf(html: str) -> bytes:
+    """Converte HTML para PDF. Tenta WeasyPrint (Linux/Cloud); cai para xhtml2pdf (Windows)."""
+    try:
+        import weasyprint
+        return weasyprint.HTML(string=html).write_pdf()
+    except Exception:
+        from xhtml2pdf import pisa
+        from io import BytesIO
+        buf = BytesIO()
+        pisa.CreatePDF(html.encode("utf-8"), dest=buf)
+        return buf.getvalue()
+
+
 def _build_pdf(result: dict) -> bytes:
-    """Gera PDF com capa, KPIs, resumo SLA, tabelas e graficos."""
-    df_g   = result["geral"]
-    ref    = result["ref_time"]
+    """Gera PDF com visual de dashboard (HTML -> PDF)."""
+
+    df_g    = result["geral"]
+    ref     = result["ref_time"]
     total   = len(df_g)
     fech    = int((df_g["status"] == "closed").sum())
     proc    = int((df_g["status"] == "processing").sum())
     abertos = int((df_g["status"] == "open").sum())
     alert   = int((df_g["sla_alerta"] == "SIM").sum())
-
     sla_p_med  = df_g["tempo_processo_h"].mean()
     sla_p_max  = df_g["tempo_processo_h"].max()
     sla_r_med  = df_g["tempo_resposta_h"].mean()
     pct_alerta = alert / total * 100 if total else 0
 
-    pdf = _RelatorioPDF(ref)
-    pdf.set_auto_page_break(auto=True, margin=18)
-    pdf.set_margins(15, 22, 15)
+    # ── Gerar charts como base64 ──────────────────────────────────────────
+    _cs = dict(plot_bgcolor="white", paper_bgcolor="white",
+               bargap=0.22, font=dict(family="Arial, sans-serif", size=11))
+    b64 = {}
+    try:
+        # Funil mensal
+        fig = px.bar(result["funil_m"], y="periodo",
+                     x=["tickets_fechados", "em_processo"],
+                     barmode="group", orientation="h",
+                     color_discrete_map={"tickets_fechados": "#2CA02C",
+                                         "em_processo": "#FF7F0E"})
+        fig.update_layout(height=280, width=600, legend_title_text="",
+                          legend=dict(orientation="h", y=1.12),
+                          margin=dict(t=10, b=10, l=10, r=10),
+                          yaxis=dict(automargin=True), **_cs)
+        fig.update_traces(textposition="outside", cliponaxis=False,
+                          texttemplate="%{x}")
+        b64["funil"] = _fig_to_b64(fig)
 
-    # ─── Pagina 1: Capa + KPIs + Funil ────────────────────────────────────
-    pdf.add_page()
+        # Volume por escritório
+        df_e = result["escrit"].sort_values("total_tickets", ascending=True).tail(15)
+        fig = px.bar(df_e, x="total_tickets", y="escritorio", orientation="h",
+                     color="pct_fechado", color_continuous_scale="RdYlGn",
+                     range_color=[0, 100], text="total_tickets",
+                     labels={"total_tickets": "Total", "escritorio": ""})
+        fig.update_layout(height=400, width=700, margin=dict(t=10, b=10, l=10, r=70),
+                          coloraxis_colorbar_title="% Fechado",
+                          yaxis=dict(automargin=True), **_cs)
+        fig.update_traces(textposition="outside", cliponaxis=False)
+        b64["escrit"] = _fig_to_b64(fig)
 
-    # Faixa de capa
-    pdf.set_fill_color(31, 56, 100)
-    pdf.rect(0, 0, pdf.w, 44, "F")
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_font("Helvetica", "B", 24)
-    pdf.set_xy(15, 7)
-    pdf.cell(0, 12, text="Relatorio BKO", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_xy(15, 20)
-    pdf.set_font("Helvetica", "", 12)
-    pdf.cell(0, 8, text="Dashboard de Tickets", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_xy(15, 31)
-    pdf.set_font("Helvetica", "", 9)
-    pdf.set_text_color(160, 200, 255)
-    pdf.cell(0, 8, text=f"Gerado em {ref}", new_x="LMARGIN", new_y="NEXT")
-    pdf.set_text_color(0, 0, 0)
+        # Top 20 tickets em espera
+        df_sla = result.get("sla_p", pd.DataFrame())
+        if not df_sla.empty and "tempo_processo_h" in df_sla.columns:
+            df_top = df_sla.sort_values("tempo_processo_h", ascending=False).head(20).copy()
+            df_top["label"] = ("#" + df_top["ticket_id"].astype(str) + "  " +
+                               df_top["ticket_subject"].str.slice(0, 30))
+            df_top["cor"] = df_top["tempo_processo_h"].apply(
+                lambda h: "#D62728" if h > 24 else ("#FF7F0E" if h > 10 else "#2CA02C"))
+            fig = px.bar(df_top.sort_values("tempo_processo_h", ascending=True),
+                         x="tempo_processo_h", y="label", orientation="h",
+                         color="cor", color_discrete_map="identity", text_auto=".1f",
+                         labels={"tempo_processo_h": "Horas", "label": ""})
+            fig.update_layout(height=440, width=720, showlegend=False,
+                              margin=dict(t=10, b=10, l=10, r=30),
+                              yaxis=dict(automargin=True), **_cs)
+            fig.update_traces(textposition="outside", cliponaxis=False)
+            b64["top20"] = _fig_to_b64(fig)
 
-    pdf.set_xy(15, 52)
+        # Volume por departamento
+        df_dept = result.get("depto", pd.DataFrame())
+        if not df_dept.empty and "departamento" in df_dept.columns:
+            fig = px.bar(df_dept.sort_values("total_tickets", ascending=True),
+                         x="total_tickets", y="departamento", orientation="h",
+                         color="pct_fechado", color_continuous_scale="RdYlGn",
+                         range_color=[0, 100], text="total_tickets",
+                         labels={"total_tickets": "Total", "departamento": ""})
+            fig.update_layout(height=300, width=600, margin=dict(t=10, b=10, l=10, r=60),
+                              coloraxis_colorbar_title="% Fechado",
+                              yaxis=dict(automargin=True), **_cs)
+            fig.update_traces(textposition="outside", cliponaxis=False)
+            b64["dept"] = _fig_to_b64(fig)
+    except Exception as exc:
+        _log(f"Charts HTML PDF ignorados: {exc}")
 
-    # Cards KPI
-    kpis = [
-        ("Total de Tickets",  f"{total:,}",    "",                                    "1F3864"),
-        ("Fechados",          f"{fech:,}",     f"{fech/total*100:.1f}% do total",     "2CA02C"),
-        ("Em Processamento",  f"{proc:,}",     f"{proc/total*100:.1f}% do total",     "FF7F0E"),
-        ("Abertos",           f"{abertos:,}",  f"{abertos/total*100:.1f}% do total",  "1F77B4"),
-        ("SLA Alerta >24h",   f"{alert:,}",    f"{pct_alerta:.1f}% do total",         "D62728"),
-    ]
-    _pdf_kpi_row(pdf, kpis)
-    pdf.ln(3)
+    # ── Helpers ───────────────────────────────────────────────────────────
+    def kpi(label, value, sub, color):
+        sub_html = f'<div class="ks">{sub}</div>' if sub else ""
+        return (f'<div class="kc" style="border-top:4px solid {color}">'
+                f'<div class="kv" style="color:{color}">{value}</div>'
+                f'{sub_html}<div class="kl">{label}</div></div>')
 
-    # Faixa de resumo SLA
-    pdf.set_fill_color(240, 244, 248)
-    pdf.set_draw_color(200, 210, 220)
-    y_faixa = pdf.get_y()
-    pdf.rect(pdf.l_margin, y_faixa,
-             pdf.w - pdf.l_margin - pdf.r_margin, 10, "FD")
-    pdf.set_font("Helvetica", "", 8)
-    pdf.set_text_color(60, 60, 60)
-    pdf.set_xy(pdf.l_margin + 4, y_faixa + 1)
-    sla_items = [
-        f"Proc. Medio: {sla_p_med:.1f}h"  if pd.notna(sla_p_med)  else "Proc. Medio: -",
-        f"Proc. Maximo: {sla_p_max:.1f}h" if pd.notna(sla_p_max)  else "Proc. Max: -",
-        f"Resp. Media: {sla_r_med:.1f}h"  if pd.notna(sla_r_med)  else "Resp. Media: -",
-        f"Em Alerta: {pct_alerta:.1f}% dos tickets",
-    ]
-    pdf.cell(0, 8, text="   |   ".join(sla_items),
-             new_x="LMARGIN", new_y="NEXT")
-    pdf.set_draw_color(0, 0, 0)
-    pdf.ln(5)
+    def sec(title):
+        return f'<div class="st">{title}</div>'
 
-    # Funil Mensal (sem coluna Abertos — so fechados e em_processo)
-    _section_title(pdf, "Funil Mensal")
-    heads_f = ["Periodo",  "Fechados", "Em Processo", "% Fechado", "SLA"]
-    wids_f  = [45, 33, 38, 34, 30]
-    alns_f  = ["C", "R",  "R",         "R",          "R"]
-    cols_f  = ["periodo", "tickets_fechados", "em_processo",
-               "pct_fechado", "tempo_medio_resposta_h"]
-    _pdf_table_header(pdf, heads_f, wids_f, alns_f)
-    for i, (_, row) in enumerate(result["funil_m"][cols_f].tail(12).iterrows()):
-        resp = f"{row['tempo_medio_resposta_h']:.1f}" if pd.notna(row["tempo_medio_resposta_h"]) else "-"
-        _pdf_table_row(pdf, [
-            row["periodo"],
-            f"{int(row['tickets_fechados']):,}",
-            f"{int(row['em_processo']):,}",
-            f"{row['pct_fechado']:.1f}%",
-            resp,
-        ], wids_f, i, alns_f)
+    def img(key, alt=""):
+        if key not in b64:
+            return ""
+        return f'<div class="cb"><img src="data:image/png;base64,{b64[key]}" alt="{alt}"/></div>'
 
-    # ─── Pagina 2: Assuntos + Escritorios ─────────────────────────────────
-    pdf.add_page()
+    def tbl_rows(df, cols, fmts=None):
+        fmts = fmts or {}
+        out = ""
+        for i, (_, row) in enumerate(df.iterrows()):
+            cls = ' class="z"' if i % 2 == 0 else ""
+            cells = ""
+            for c in cols:
+                v = row.get(c, "")
+                try:
+                    v = fmts[c](v) if c in fmts else (str(v) if pd.notna(v) else "-")
+                except Exception:
+                    v = "-"
+                cells += f"<td>{v}</td>"
+            out += f"<tr{cls}>{cells}</tr>"
+        return out
 
-    _section_title(pdf, "Top 10 Assuntos por Volume")
-    heads_a = ["Assunto",  "Total", "Fechados", "Em Proc.", "% Fech.", "SLA"]
-    wids_a  = [60, 20, 24, 26, 22, 28]
-    alns_a  = ["L", "R",  "R",  "R",      "R",      "R"]
-    _pdf_table_header(pdf, heads_a, wids_a, alns_a)
-    for i, (_, row) in enumerate(result["assunto"].head(10).iterrows()):
-        resp = f"{row['tempo_medio_resposta_h']:.1f}" if pd.notna(row.get("tempo_medio_resposta_h")) else "-"
-        _pdf_table_row(pdf, [
-            _trunc(row["assunto"], 34),
-            f"{int(row['total']):,}",
-            f"{int(row['fechados']):,}",
-            f"{int(row['em_processo']):,}",
-            f"{row['pct_fechado']:.1f}%",
-            resp,
-        ], wids_a, i, alns_a)
+    # ── Dados tabelas ─────────────────────────────────────────────────────
+    fm = {"tickets_fechados": lambda v: f"{int(v):,}",
+          "em_processo":      lambda v: f"{int(v):,}",
+          "pct_fechado":      lambda v: f"{v:.1f}%",
+          "tempo_medio_resposta_h": lambda v: f"{v:.1f}h" if pd.notna(v) else "-"}
+    funil_rows = tbl_rows(result["funil_m"].tail(12),
+                          ["periodo","tickets_fechados","em_processo",
+                           "pct_fechado","tempo_medio_resposta_h"], fm)
 
-    pdf.ln(7)
+    am = {"total": lambda v: f"{int(v):,}", "fechados": lambda v: f"{int(v):,}",
+          "em_processo": lambda v: f"{int(v):,}", "pct_fechado": lambda v: f"{v:.1f}%",
+          "tempo_medio_resposta_h": lambda v: f"{v:.1f}h" if pd.notna(v) else "-",
+          "assunto": lambda v: str(v)[:45] if pd.notna(v) else "-"}
+    assunto_rows = tbl_rows(result["assunto"].head(15),
+                            ["assunto","total","fechados","em_processo",
+                             "pct_fechado","tempo_medio_resposta_h"], am)
 
-    _section_title(pdf, "Top 10 Escritorios")
-    heads_e = ["Escritorio", "Total", "Fechados", "Pendentes", "% Fech.", "SLA"]
-    wids_e  = [54, 20, 24, 28, 22, 32]
-    alns_e  = ["L", "R",  "R",  "R",       "R",      "R"]
-    _pdf_table_header(pdf, heads_e, wids_e, alns_e)
-    for i, (_, row) in enumerate(result["escrit"].head(10).iterrows()):
-        resp = f"{row['tempo_medio_resposta_h']:.1f}" if pd.notna(row.get("tempo_medio_resposta_h")) else "-"
-        _pdf_table_row(pdf, [
-            _trunc(row["escritorio"], 30),
-            f"{int(row['total_tickets']):,}",
-            f"{int(row['fechados']):,}",
-            f"{int(row['pendentes']):,}",
-            f"{row['pct_fechado']:.1f}%",
-            resp,
-        ], wids_e, i, alns_e)
+    em = {"total_tickets": lambda v: f"{int(v):,}",
+          "fechados":      lambda v: f"{int(v):,}",
+          "pendentes":     lambda v: f"{int(v):,}",
+          "pct_fechado":   lambda v: f"{v:.1f}%",
+          "tempo_medio_resposta_h": lambda v: f"{v:.1f}h" if pd.notna(v) else "-",
+          "escritorio": lambda v: str(v)[:35] if pd.notna(v) else "-"}
+    escrit_rows = tbl_rows(result["escrit"].head(15),
+                           ["escritorio","total_tickets","fechados",
+                            "pendentes","pct_fechado","tempo_medio_resposta_h"], em)
 
-    # ─── Pagina 3: Por Departamento + Aba Geral ───────────────────────────
     df_dept = result.get("depto", pd.DataFrame())
+    dept_section = ""
     if not df_dept.empty:
-        pdf.add_page()
-        _section_title(pdf, "Resumo por Departamento")
-        heads_d = ["Departamento", "Total", "Fechados", "Em Proc.", "% Fech.", "Resp. Med (h)", "Proc. Med (h)"]
-        wids_d  = [45, 18, 22, 22, 20, 30, 30]
-        alns_d  = ["L", "R", "R", "R", "R", "R", "R"]
-        _pdf_table_header(pdf, heads_d, wids_d, alns_d)
-        for i, (_, row) in enumerate(df_dept.iterrows()):
-            resp = f"{row['tempo_medio_resposta_h']:.1f}" if pd.notna(row.get("tempo_medio_resposta_h")) else "-"
-            proc = f"{row['tempo_medio_processo_h']:.1f}" if pd.notna(row.get("tempo_medio_processo_h")) else "-"
-            _pdf_table_row(pdf, [
-                _trunc(str(row["departamento"]), 26),
-                f"{int(row['total_tickets']):,}",
-                f"{int(row['fechados']):,}",
-                f"{int(row['em_processo']):,}",
-                f"{row['pct_fechado']:.1f}%",
-                resp,
-                proc,
-            ], wids_d, i, alns_d)
+        dm = {"total_tickets": lambda v: f"{int(v):,}",
+              "fechados":      lambda v: f"{int(v):,}",
+              "em_processo":   lambda v: f"{int(v):,}",
+              "pct_fechado":   lambda v: f"{v:.1f}%",
+              "tempo_medio_resposta_h": lambda v: f"{v:.1f}h" if pd.notna(v) else "-",
+              "tempo_medio_processo_h": lambda v: f"{v:.1f}h" if pd.notna(v) else "-",
+              "departamento": lambda v: str(v)[:30] if pd.notna(v) else "-"}
+        dept_rows = tbl_rows(df_dept,
+                             ["departamento","total_tickets","fechados","em_processo",
+                              "pct_fechado","tempo_medio_resposta_h","tempo_medio_processo_h"], dm)
+        dept_section = f"""
+        <div class="pb"></div>
+        {sec('Resumo por Departamento')}
+        {img('dept')}
+        <table><thead><tr>
+          <th>Departamento</th><th>Total</th><th>Fechados</th><th>Em Proc.</th>
+          <th>% Fech.</th><th>Resp. Med (h)</th><th>Proc. Med (h)</th>
+        </tr></thead><tbody>{dept_rows}</tbody></table>"""
 
-    # Aba Geral — Top 50 tickets por tempo em processo
-    pdf.add_page()
-    _section_title(pdf, "Top 50 Tickets por Tempo em Processo")
-    pdf.set_font("Helvetica", "I", 7)
-    pdf.set_text_color(120, 120, 120)
-    pdf.cell(0, 5, text="Tickets ativos com maior tempo em aberto, ordenados por urgencia.",
-             new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(2)
-    pdf.set_text_color(0, 0, 0)
+    df_top50 = (df_g[df_g["status"].isin(["open","processing"])]
+                .sort_values("tempo_processo_h", ascending=False).head(50))
+    gm = {"tempo_processo_h": lambda v: f"{v:.1f}h" if pd.notna(v) else "-",
+          "tempo_resposta_h": lambda v: f"{v:.1f}h" if pd.notna(v) else "-",
+          "ticket_subject":   lambda v: str(v)[:50] if pd.notna(v) else "-",
+          "analista":         lambda v: str(v)[:28] if pd.notna(v) else "-",
+          "status":           lambda v: str(v) if pd.notna(v) else "-"}
+    top50_rows = tbl_rows(df_top50,
+                          ["ticket_id","ticket_subject","status",
+                           "tempo_processo_h","tempo_resposta_h","analista"], gm)
 
-    df_top50 = (
-        df_g[df_g["status"].isin(["open", "processing"])]
-        .sort_values("tempo_processo_h", ascending=False)
-        .head(50)
-    )
-    heads_g = ["Ticket ID", "Assunto", "Status", "Proc. (h)", "Resp. (h)", "Analista"]
-    wids_g  = [22, 60, 22, 20, 20, 36]
-    alns_g  = ["C", "L", "C", "R", "R", "L"]
-    _pdf_table_header(pdf, heads_g, wids_g, alns_g)
-    for i, (_, row) in enumerate(df_top50.iterrows()):
-        proc = f"{row['tempo_processo_h']:.1f}" if pd.notna(row.get("tempo_processo_h")) else "-"
-        resp = f"{row['tempo_resposta_h']:.1f}"  if pd.notna(row.get("tempo_resposta_h"))  else "-"
-        _pdf_table_row(pdf, [
-            str(row.get("ticket_id", "-")),
-            _trunc(str(row.get("ticket_subject", "-")), 34),
-            str(row.get("status", "-")),
-            proc,
-            resp,
-            _trunc(str(row.get("analista", "-")), 20),
-        ], wids_g, i, alns_g)
+    sla_bar = "&nbsp;&nbsp;|&nbsp;&nbsp;".join([
+        f"Proc. Médio: {sla_p_med:.1f}h"  if pd.notna(sla_p_med)  else "Proc. Médio: —",
+        f"Proc. Máximo: {sla_p_max:.1f}h" if pd.notna(sla_p_max)  else "Proc. Máx: —",
+        f"Resp. Média: {sla_r_med:.1f}h"  if pd.notna(sla_r_med)  else "Resp. Média: —",
+        f"Em Alerta: {pct_alerta:.1f}% dos tickets",
+    ])
 
-    # ─── Graficos (se kaleido disponivel) ─────────────────────────────────
-    _pdf_add_charts(pdf, result)
+    pct_f = fech/total*100 if total else 0
+    pct_p = proc/total*100 if total else 0
+    pct_a = abertos/total*100 if total else 0
 
-    return bytes(pdf.output())
+    # ── HTML ──────────────────────────────────────────────────────────────
+    html = f"""<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"/>
+<style>
+@page {{
+  size: A4; margin: 14mm 14mm 18mm 14mm;
+  @bottom-center {{ content: "Página " counter(page) " de " counter(pages);
+                    font-size: 8pt; color: #aaa; }}
+}}
+* {{ box-sizing: border-box; margin: 0; padding: 0; }}
+body {{ font-family: Arial, Helvetica, sans-serif; font-size: 9.5pt;
+        color: #1a1a2e; background: white; }}
+.cover {{ background: #1F3864; color: white; padding: 26px 22px 20px;
+          border-radius: 6px; margin-bottom: 16px; }}
+.cover h1 {{ font-size: 24pt; font-weight: bold; margin-bottom: 3px; }}
+.cover h2 {{ font-size: 12pt; font-weight: normal; opacity: .82; margin-bottom: 6px; }}
+.cover .ref {{ font-size: 8.5pt; color: #90b8ff; }}
+.kg {{ display: grid; grid-template-columns: repeat(5,1fr); gap: 8px; margin-bottom: 12px; }}
+.kc {{ background: #f6f8fd; border-radius: 5px; padding: 9px 7px 7px;
+       text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,.1); }}
+.kv {{ font-size: 19pt; font-weight: bold; line-height: 1.1; }}
+.ks {{ font-size: 7pt; color: #888; margin: 1px 0 2px; }}
+.kl {{ font-size: 7.5pt; color: #555; font-weight: bold; margin-top: 3px; }}
+.sb {{ background: #eef2f7; border: 1px solid #cdd8e8; border-radius: 4px;
+       padding: 5px 10px; font-size: 8pt; color: #444; margin-bottom: 16px; }}
+.st {{ background: #2c3e50; color: white; padding: 5px 11px; font-size: 10.5pt;
+       font-weight: bold; border-radius: 4px; margin: 16px 0 8px; }}
+table {{ width: 100%; border-collapse: collapse; font-size: 7.8pt; margin-bottom: 10px; }}
+thead th {{ background: #1F3864; color: white; padding: 5px 6px; text-align: left; }}
+tbody tr.z {{ background: #f3f7fc; }}
+tbody td {{ padding: 4px 6px; border-bottom: 1px solid #e2e8f0; }}
+.cb {{ background: #f6f8fd; border-radius: 6px; padding: 8px;
+       box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 10px; }}
+.cb img {{ width: 100%; display: block; }}
+.two {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }}
+.pb {{ page-break-before: always; }}
+.note {{ font-size: 7.5pt; color: #888; font-style: italic; margin-bottom: 8px; }}
+</style></head><body>
+
+<div class="cover">
+  <h1>Relatorio BKO</h1>
+  <h2>Dashboard de Tickets</h2>
+  <div class="ref">Gerado em {ref}</div>
+</div>
+
+<div class="kg">
+  {kpi("Total de Tickets", f"{total:,}", "", "#1F3864")}
+  {kpi("Fechados",         f"{fech:,}",    f"{pct_f:.1f}% do total", "#2CA02C")}
+  {kpi("Em Processamento", f"{proc:,}",    f"{pct_p:.1f}% do total", "#FF7F0E")}
+  {kpi("Abertos",          f"{abertos:,}", f"{pct_a:.1f}% do total", "#1F77B4")}
+  {kpi("SLA Alerta &gt;24h", f"{alert:,}", f"{pct_alerta:.1f}% do total", "#D62728")}
+</div>
+<div class="sb">{sla_bar}</div>
+
+{sec('Funil Mensal')}
+<table><thead><tr>
+  <th>Periodo</th><th>Fechados</th><th>Em Processo</th><th>% Fechado</th><th>Resp. Media (h)</th>
+</tr></thead><tbody>{funil_rows}</tbody></table>
+{img('funil')}
+
+<div class="pb"></div>
+{sec('Top 15 Assuntos por Volume')}
+<table><thead><tr>
+  <th>Assunto</th><th>Total</th><th>Fechados</th><th>Em Proc.</th><th>% Fech.</th><th>Resp. Med (h)</th>
+</tr></thead><tbody>{assunto_rows}</tbody></table>
+
+{sec('Top 15 Escritorios por Volume')}
+<table><thead><tr>
+  <th>Escritorio</th><th>Total</th><th>Fechados</th><th>Pendentes</th><th>% Fech.</th><th>Resp. Med (h)</th>
+</tr></thead><tbody>{escrit_rows}</tbody></table>
+{img('escrit')}
+
+{dept_section}
+
+<div class="pb"></div>
+{sec('Top 20 Tickets com Maior Tempo em Espera')}
+{img('top20')}
+
+<div class="pb"></div>
+{sec('Top 50 Tickets Ativos por Urgencia')}
+<p class="note">Tickets com status aberto ou em processamento, ordenados por tempo em aberto.</p>
+<table><thead><tr>
+  <th>Ticket ID</th><th>Assunto</th><th>Status</th>
+  <th>Proc. (h)</th><th>Resp. (h)</th><th>Analista</th>
+</tr></thead><tbody>{top50_rows}</tbody></table>
+
+</body></html>"""
+
+    return _html_to_pdf(html)
 
 
 def _enviar_email(destinatario: str, xlsx_bytes: bytes, ref_time: str) -> None:
