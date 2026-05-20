@@ -614,12 +614,10 @@ def big_numbers(df: pd.DataFrame):
             if delta else '<span class="bko-delta">&nbsp;</span>'
         )
         items += f"""
-        <div class="bko-wrapper" style="--c:{color};">
-            <div class="bko-top">
-                <p class="bko-label">{label}</p>
-                <p class="bko-value" style="color:{color};">{value}</p>
-                {delta_html}
-            </div>
+        <div class="bko-card" style="--c:{color}; border-color:{color}; box-shadow:0 5px 0 {color};">
+            <p class="bko-label">{label}</p>
+            <p class="bko-value" style="color:{color};">{value}</p>
+            {delta_html}
         </div>"""
 
     st.markdown(f"""
@@ -628,34 +626,28 @@ def big_numbers(df: pd.DataFrame):
         display: grid;
         grid-template-columns: repeat(5, 1fr);
         gap: 18px;
-        margin-bottom: 1.6rem;
+        margin-bottom: 2rem;
     }}
-    .bko-wrapper {{
-        --radius: 0.75em;
-        border-radius: var(--radius);
-        background: var(--c);
-        cursor: default;
-    }}
-    .bko-top {{
-        display: block;
-        box-sizing: border-box;
-        border: 2px solid var(--c);
-        border-radius: var(--radius);
+    .bko-card {{
+        border-radius: 0.75em;
+        border: 2px solid;
         padding: 20px 22px 16px;
-        background: var(--secondary-background-color);
-        transform: translateY(-0.22em);
-        transition: transform 0.12s ease;
+        background: #262730;
+        cursor: default;
+        transform: translateY(-3px);
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
     }}
-    .bko-wrapper:hover .bko-top {{
-        transform: translateY(-0.38em);
+    .bko-card:hover {{
+        transform: translateY(-6px);
+        box-shadow: 0 8px 0 var(--c) !important;
     }}
-    .bko-wrapper:active .bko-top {{
-        transform: translateY(0);
+    .bko-card:active {{
+        transform: translateY(2px);
+        box-shadow: 0 1px 0 var(--c) !important;
     }}
     .bko-label {{
         font-size: 0.72rem;
-        color: var(--text-color);
-        opacity: 0.55;
+        color: #aaaaaa;
         margin: 0 0 10px 0;
         font-weight: 700;
         text-transform: uppercase;
