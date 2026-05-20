@@ -590,22 +590,74 @@ def _fmt_h(h) -> str:
 
 
 def big_numbers(df: pd.DataFrame):
-    total      = len(df)
-    fechados   = (df["status"] == "closed").sum()
-    em_proc    = (df["status"] == "processing").sum()
-    abertos    = (df["status"] == "open").sum()
-    alertas    = (df["sla_alerta"] == "SIM").sum()
+    total    = len(df)
+    fechados = int((df["status"] == "closed").sum())
+    em_proc  = int((df["status"] == "processing").sum())
+    abertos  = int((df["status"] == "open").sum())
+    alertas  = int((df["sla_alerta"] == "SIM").sum())
 
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Total de Tickets", f"{total:,}")
-    c2.metric("Fechados",         f"{fechados:,}",
-              delta=f"{fechados/total*100:.1f}%")
-    c3.metric("Em Processamento", f"{em_proc:,}",
-              delta=f"{em_proc/total*100:.1f}%",   delta_color="inverse")
-    c4.metric("Abertos",          f"{abertos:,}",
-              delta=f"{abertos/total*100:.1f}%",   delta_color="inverse")
-    c5.metric("SLA Alerta >24h",  f"{alertas:,}",
-              delta_color="inverse")
+    def pct(n: int) -> str:
+        return f"{n / total * 100:.1f}%" if total else "—"
+
+    cards = [
+        ("Total de Tickets", f"{total:,}",    "",           COR_PRINCIPAL[1:]),
+        ("Fechados",         f"{fechados:,}", pct(fechados), COR_FECHADO[1:]),
+        ("Em Processamento", f"{em_proc:,}",  pct(em_proc),  COR_PROCESSO[1:]),
+        ("Abertos",          f"{abertos:,}",  pct(abertos),  COR_ABERTO[1:]),
+        ("SLA Alerta >24h",  f"{alertas:,}",  pct(alertas),  COR_ALERTA[1:]),
+    ]
+
+    items = ""
+    for label, value, delta, color_hex in cards:
+        color = f"#{color_hex}"
+        delta_html = (
+            f'<p class="bko-delta" style="color:{color};">{delta}</p>'
+            if delta else '<p class="bko-delta">&nbsp;</p>'
+        )
+        items += f"""
+        <div class="bko-card" style="border-top:4px solid {color};">
+            <p class="bko-label">{label}</p>
+            <p class="bko-value" style="color:{color};">{value}</p>
+            {delta_html}
+        </div>"""
+
+    st.markdown(f"""
+    <style>
+    .bko-grid {{
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 14px;
+        margin-bottom: 1.2rem;
+    }}
+    .bko-card {{
+        background: var(--secondary-background-color);
+        border-radius: 8px;
+        padding: 18px 20px 14px;
+        box-shadow: 0 2px 8px rgba(0,0,0,.18);
+    }}
+    .bko-label {{
+        font-size: 0.75rem;
+        color: var(--text-color);
+        opacity: 0.6;
+        margin: 0 0 8px 0;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+    }}
+    .bko-value {{
+        font-size: 2rem;
+        font-weight: 700;
+        margin: 0 0 6px 0;
+        line-height: 1.1;
+    }}
+    .bko-delta {{
+        font-size: 0.82rem;
+        font-weight: 600;
+        margin: 0;
+    }}
+    </style>
+    <div class="bko-grid">{items}</div>
+    """, unsafe_allow_html=True)
 
 
 # ---- Aba Geral ----
