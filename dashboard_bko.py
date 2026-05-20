@@ -514,70 +514,79 @@ def _build_pdf(result: dict) -> bytes:
     sla_r_med  = df_g["tempo_resposta_h"].mean()
     pct_alerta = alert / total * 100 if total else 0
 
-    # ── Gerar charts como base64 ──────────────────────────────────────────
+    # ── Gerar charts como base64 (cada um isolado) ───────────────────────
     _cs = dict(plot_bgcolor="white", paper_bgcolor="white",
                bargap=0.22, font=dict(family="Arial, sans-serif", size=11))
     b64 = {}
-    try:
-        # Funil mensal
+
+    def _try_chart(key, build_fn):
+        try:
+            b64[key] = _fig_to_b64(build_fn())
+        except Exception as exc:
+            _log(f"Chart '{key}' ignorado no PDF: {exc}")
+
+    def _make_funil():
         fig = px.bar(result["funil_m"], y="periodo",
                      x=["tickets_fechados", "em_processo"],
                      barmode="group", orientation="h",
-                     color_discrete_map={"tickets_fechados": "#2CA02C",
-                                         "em_processo": "#FF7F0E"})
-        fig.update_layout(height=280, width=600, legend_title_text="",
+                     color_discrete_map={"tickets_fechados": "#2CA02C", "em_processo": "#FF7F0E"})
+        fig.update_layout(height=280, width=620, legend_title_text="",
                           legend=dict(orientation="h", y=1.12),
                           margin=dict(t=10, b=10, l=10, r=10),
                           yaxis=dict(automargin=True), **_cs)
-        fig.update_traces(textposition="outside", cliponaxis=False,
-                          texttemplate="%{x}")
-        b64["funil"] = _fig_to_b64(fig)
+        fig.update_traces(textposition="outside", cliponaxis=False, texttemplate="%{x}")
+        return fig
 
-        # Volume por escritório
+    def _make_escrit():
         df_e = result["escrit"].sort_values("total_tickets", ascending=True).tail(15)
         fig = px.bar(df_e, x="total_tickets", y="escritorio", orientation="h",
                      color="pct_fechado", color_continuous_scale="RdYlGn",
                      range_color=[0, 100], text="total_tickets",
                      labels={"total_tickets": "Total", "escritorio": ""})
-        fig.update_layout(height=400, width=700, margin=dict(t=10, b=10, l=10, r=70),
+        fig.update_layout(height=420, width=720, margin=dict(t=10, b=10, l=10, r=70),
                           coloraxis_colorbar_title="% Fechado",
                           yaxis=dict(automargin=True), **_cs)
         fig.update_traces(textposition="outside", cliponaxis=False)
-        b64["escrit"] = _fig_to_b64(fig)
+        return fig
 
-        # Top 20 tickets em espera
+    def _make_top20():
         df_sla = result.get("sla_p", pd.DataFrame())
-        if not df_sla.empty and "tempo_processo_h" in df_sla.columns:
-            df_top = df_sla.sort_values("tempo_processo_h", ascending=False).head(20).copy()
-            df_top["label"] = ("#" + df_top["ticket_id"].astype(str) + "  " +
-                               df_top["ticket_subject"].str.slice(0, 30))
-            df_top["cor"] = df_top["tempo_processo_h"].apply(
-                lambda h: "#D62728" if h > 24 else ("#FF7F0E" if h > 10 else "#2CA02C"))
-            fig = px.bar(df_top.sort_values("tempo_processo_h", ascending=True),
-                         x="tempo_processo_h", y="label", orientation="h",
-                         color="cor", color_discrete_map="identity", text_auto=".1f",
-                         labels={"tempo_processo_h": "Horas", "label": ""})
-            fig.update_layout(height=440, width=720, showlegend=False,
-                              margin=dict(t=10, b=10, l=10, r=30),
-                              yaxis=dict(automargin=True), **_cs)
-            fig.update_traces(textposition="outside", cliponaxis=False)
-            b64["top20"] = _fig_to_b64(fig)
+        if df_sla.empty or "tempo_processo_h" not in df_sla.columns:
+            raise ValueError("sla_p vazio")
+        df_top = df_sla.sort_values("tempo_processo_h", ascending=False).head(20).copy()
+        df_top["label"] = ("#" + df_top["ticket_id"].astype(str) + "  " +
+                           df_top["ticket_subject"].str.slice(0, 32))
+        df_top["cor"] = df_top["tempo_processo_h"].apply(
+            lambda h: "#D62728" if h > 24 else ("#FF7F0E" if h > 10 else "#2CA02C"))
+        fig = px.bar(df_top.sort_values("tempo_processo_h", ascending=True),
+                     x="tempo_processo_h", y="label", orientation="h",
+                     color="cor", color_discrete_map="identity", text_auto=".1f",
+                     labels={"tempo_processo_h": "Horas", "label": ""})
+        fig.update_layout(height=460, width=740, showlegend=False,
+                          margin=dict(t=10, b=10, l=10, r=30),
+                          yaxis=dict(automargin=True), **_cs)
+        fig.update_traces(textposition="outside", cliponaxis=False)
+        return fig
 
-        # Volume por departamento
-        df_dept = result.get("depto", pd.DataFrame())
-        if not df_dept.empty and "departamento" in df_dept.columns:
-            fig = px.bar(df_dept.sort_values("total_tickets", ascending=True),
-                         x="total_tickets", y="departamento", orientation="h",
-                         color="pct_fechado", color_continuous_scale="RdYlGn",
-                         range_color=[0, 100], text="total_tickets",
-                         labels={"total_tickets": "Total", "departamento": ""})
-            fig.update_layout(height=300, width=600, margin=dict(t=10, b=10, l=10, r=60),
-                              coloraxis_colorbar_title="% Fechado",
-                              yaxis=dict(automargin=True), **_cs)
-            fig.update_traces(textposition="outside", cliponaxis=False)
-            b64["dept"] = _fig_to_b64(fig)
-    except Exception as exc:
-        _log(f"Charts HTML PDF ignorados: {exc}")
+    def _make_dept():
+        df_d = result.get("depto", pd.DataFrame())
+        if df_d.empty or "departamento" not in df_d.columns:
+            raise ValueError("depto vazio")
+        fig = px.bar(df_d.sort_values("total_tickets", ascending=True),
+                     x="total_tickets", y="departamento", orientation="h",
+                     color="pct_fechado", color_continuous_scale="RdYlGn",
+                     range_color=[0, 100], text="total_tickets",
+                     labels={"total_tickets": "Total", "departamento": ""})
+        fig.update_layout(height=300, width=620, margin=dict(t=10, b=10, l=10, r=60),
+                          coloraxis_colorbar_title="% Fechado",
+                          yaxis=dict(automargin=True), **_cs)
+        fig.update_traces(textposition="outside", cliponaxis=False)
+        return fig
+
+    _try_chart("funil",  _make_funil)
+    _try_chart("escrit", _make_escrit)
+    _try_chart("top20",  _make_top20)
+    _try_chart("dept",   _make_dept)
 
     # ── Helpers ───────────────────────────────────────────────────────────
     def kpi(label, value, sub, color):
@@ -670,6 +679,24 @@ def _build_pdf(result: dict) -> bytes:
                           ["ticket_id","ticket_subject","status",
                            "tempo_processo_h","tempo_resposta_h","analista"], gm)
 
+    # Tabela fallback para top20 quando grafico nao carrega
+    df_sla_top20 = result.get("sla_p", pd.DataFrame())
+    if not df_sla_top20.empty and "top20" not in b64:
+        tm = {"tempo_processo_h": lambda v: f"{v:.1f}h" if pd.notna(v) else "-",
+              "ticket_subject":   lambda v: str(v)[:50] if pd.notna(v) else "-",
+              "analista":         lambda v: str(v)[:28] if pd.notna(v) else "-"}
+        _t20_rows = tbl_rows(
+            df_sla_top20.sort_values("tempo_processo_h", ascending=False).head(20),
+            ["ticket_id","ticket_subject","status","tempo_processo_h","sla_alerta","analista"], tm)
+        top20_fallback_tbl = (
+            "<table><thead><tr>"
+            "<th>Ticket ID</th><th>Assunto</th><th>Status</th>"
+            "<th>Proc. (h)</th><th>SLA</th><th>Analista</th>"
+            f"</tr></thead><tbody>{_t20_rows}</tbody></table>"
+        )
+    else:
+        top20_fallback_tbl = ""
+
     sla_bar = "&nbsp;&nbsp;|&nbsp;&nbsp;".join([
         f"Proc. Médio: {sla_p_med:.1f}h"  if pd.notna(sla_p_med)  else "Proc. Médio: —",
         f"Proc. Máximo: {sla_p_max:.1f}h" if pd.notna(sla_p_max)  else "Proc. Máx: —",
@@ -758,6 +785,7 @@ tbody td {{ padding: 4px 6px; border-bottom: 1px solid #e2e8f0; }}
 <div class="pb"></div>
 {sec('Top 20 Tickets com Maior Tempo em Espera')}
 {img('top20')}
+{top20_fallback_tbl}
 
 <div class="pb"></div>
 {sec('Top 50 Tickets Ativos por Urgencia')}
