@@ -600,25 +600,26 @@ def big_numbers(df: pd.DataFrame):
         return f"{n / total * 100:.1f}%" if total else "—"
 
     cards = [
-        ("Total de Tickets", f"{total:,}",    "",           COR_PRINCIPAL[1:]),
-        ("Fechados",         f"{fechados:,}", pct(fechados), COR_FECHADO[1:]),
-        ("Em Processamento", f"{em_proc:,}",  pct(em_proc),  COR_PROCESSO[1:]),
-        ("Abertos",          f"{abertos:,}",  pct(abertos),  COR_ABERTO[1:]),
-        ("SLA Alerta >24h",  f"{alertas:,}",  pct(alertas),  COR_ALERTA[1:]),
+        ("Total de Tickets", f"{total:,}",    "",            COR_PRINCIPAL),
+        ("Fechados",         f"{fechados:,}", pct(fechados), COR_FECHADO),
+        ("Em Processamento", f"{em_proc:,}",  pct(em_proc),  COR_PROCESSO),
+        ("Abertos",          f"{abertos:,}",  pct(abertos),  COR_ABERTO),
+        ("SLA Alerta >24h",  f"{alertas:,}",  pct(alertas),  COR_ALERTA),
     ]
 
     items = ""
-    for label, value, delta, color_hex in cards:
-        color = f"#{color_hex}"
+    for label, value, delta, color in cards:
         delta_html = (
-            f'<p class="bko-delta" style="color:{color};">{delta}</p>'
-            if delta else '<p class="bko-delta">&nbsp;</p>'
+            f'<span class="bko-delta" style="color:{color};">&#x25B2; {delta}</span>'
+            if delta else '<span class="bko-delta">&nbsp;</span>'
         )
         items += f"""
-        <div class="bko-card" style="border-top:4px solid {color};">
-            <p class="bko-label">{label}</p>
-            <p class="bko-value" style="color:{color};">{value}</p>
-            {delta_html}
+        <div class="bko-wrapper" style="--c:{color};">
+            <div class="bko-top">
+                <p class="bko-label">{label}</p>
+                <p class="bko-value" style="color:{color};">{value}</p>
+                {delta_html}
+            </div>
         </div>"""
 
     st.markdown(f"""
@@ -626,34 +627,50 @@ def big_numbers(df: pd.DataFrame):
     .bko-grid {{
         display: grid;
         grid-template-columns: repeat(5, 1fr);
-        gap: 14px;
-        margin-bottom: 1.2rem;
+        gap: 18px;
+        margin-bottom: 1.6rem;
     }}
-    .bko-card {{
+    .bko-wrapper {{
+        --radius: 0.75em;
+        border-radius: var(--radius);
+        background: var(--c);
+        cursor: default;
+    }}
+    .bko-top {{
+        display: block;
+        box-sizing: border-box;
+        border: 2px solid var(--c);
+        border-radius: var(--radius);
+        padding: 20px 22px 16px;
         background: var(--secondary-background-color);
-        border-radius: 8px;
-        padding: 18px 20px 14px;
-        box-shadow: 0 2px 8px rgba(0,0,0,.18);
+        transform: translateY(-0.22em);
+        transition: transform 0.12s ease;
+    }}
+    .bko-wrapper:hover .bko-top {{
+        transform: translateY(-0.38em);
+    }}
+    .bko-wrapper:active .bko-top {{
+        transform: translateY(0);
     }}
     .bko-label {{
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         color: var(--text-color);
-        opacity: 0.6;
-        margin: 0 0 8px 0;
-        font-weight: 600;
+        opacity: 0.55;
+        margin: 0 0 10px 0;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: .05em;
+        letter-spacing: .07em;
     }}
     .bko-value {{
-        font-size: 2rem;
-        font-weight: 700;
-        margin: 0 0 6px 0;
-        line-height: 1.1;
+        font-size: 2.2rem;
+        font-weight: 800;
+        margin: 0 0 8px 0;
+        line-height: 1;
     }}
     .bko-delta {{
-        font-size: 0.82rem;
-        font-weight: 600;
-        margin: 0;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: .03em;
     }}
     </style>
     <div class="bko-grid">{items}</div>
