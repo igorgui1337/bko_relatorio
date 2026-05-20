@@ -759,13 +759,16 @@ def tab_sla_processo(df: pd.DataFrame):
         ("🔝 P90",           _fmt_h(t_p90), "",             _stat_color(t_p90)),
     ]
 
-    stat_itens = "".join(f"""
-        <div class="sla-stat">
-            <span class="sla-stat-label">{lbl}</span>
-            <span class="sla-stat-val" style="color:{cor};">{val}</span>
-            <span class="sla-stat-sub">{sub}</span>
-        </div>{"" if i == len(stats)-1 else '<div class="sla-stat-sep">|</div>'}
-    """ for i, (lbl, val, sub, cor) in enumerate(stats))
+    stat_parts = []
+    for lbl, val, sub, cor in stats:
+        stat_parts.append(
+            '<div class="sla-stat">'
+            f'<span class="sla-stat-label">{lbl}</span>'
+            f'<span class="sla-stat-val" style="color:{cor};">{val}</span>'
+            f'<span class="sla-stat-sub">{sub}</span>'
+            '</div>'
+        )
+    stat_itens = "".join(stat_parts)
 
     items  = "".join(_card_html(*c, "sla-card") for c in cards)
     fitens = "".join(_card_html(*f, "sla-card") for f in faixas)
@@ -815,8 +818,10 @@ def tab_sla_processo(df: pd.DataFrame):
     .sla-stat {{
         display: flex; flex-direction: column; align-items: center;
         flex: 1; min-width: 110px;
+        border-right: 1px solid #3a3d4a;
+        padding: 0 16px;
     }}
-    .sla-stat-sep {{ color: #444; font-size: 1.4rem; padding: 0 4px; align-self: center; }}
+    .sla-stat:last-child {{ border-right: none; }}
     .sla-stat-label {{
         font-size: 0.68rem; color: #888; font-weight: 700;
         text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px;
