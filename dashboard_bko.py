@@ -738,7 +738,36 @@ def tab_sla_processo(df: pd.DataFrame):
             {sub_html}
         </div>"""
 
-    items  = "".join(_card_html(*c, "sla-card")  for c in cards)
+    # stats para diagnóstico
+    t_min = df["tempo_processo_h"].min()
+    t_avg = df["tempo_processo_h"].mean()
+    t_p50 = df["tempo_processo_h"].median()
+    t_p90 = df["tempo_processo_h"].quantile(0.90)
+    idx_min  = df["tempo_processo_h"].idxmin() if total else None
+    id_novo  = str(df.loc[idx_min, "ticket_id"]) if idx_min is not None else "—"
+
+    def _stat_color(h):
+        if pd.isna(h):      return "#aaaaaa"
+        if h <= 10:         return COR_FECHADO
+        if h <= 24:         return COR_PROCESSO
+        return COR_ALERTA
+
+    stats = [
+        ("🕐 Mais Recente",  _fmt_h(t_min), f"#{id_novo}", _stat_color(t_min)),
+        ("📊 Media",         _fmt_h(t_avg), "",             _stat_color(t_avg)),
+        ("📈 Mediana (P50)", _fmt_h(t_p50), "",             _stat_color(t_p50)),
+        ("🔝 P90",           _fmt_h(t_p90), "",             _stat_color(t_p90)),
+    ]
+
+    stat_itens = "".join(f"""
+        <div class="sla-stat">
+            <span class="sla-stat-label">{lbl}</span>
+            <span class="sla-stat-val" style="color:{cor};">{val}</span>
+            <span class="sla-stat-sub">{sub}</span>
+        </div>{"" if i == len(stats)-1 else '<div class="sla-stat-sep">|</div>'}
+    """ for i, (lbl, val, sub, cor) in enumerate(stats))
+
+    items  = "".join(_card_html(*c, "sla-card") for c in cards)
     fitens = "".join(_card_html(*f, "sla-card") for f in faixas)
 
     st.markdown(f"""
@@ -748,8 +777,8 @@ def tab_sla_processo(df: pd.DataFrame):
         grid-template-columns: repeat(3, 1fr);
         gap: 18px;
     }}
-    .sla-grid {{ margin-bottom: 0.6rem; }}
-    .sla-fgrid {{ margin-bottom: 1.6rem; }}
+    .sla-grid  {{ margin-bottom: 0.6rem; }}
+    .sla-fgrid {{ margin-bottom: 0.8rem; }}
     .sla-card {{
         border-radius: 0.75em;
         border: 2px solid;
@@ -762,36 +791,43 @@ def tab_sla_processo(df: pd.DataFrame):
     .sla-card:hover  {{ transform: translateY(-6px); box-shadow: 0 8px 0 var(--c) !important; }}
     .sla-card:active {{ transform: translateY(2px);  box-shadow: 0 1px 0 var(--c) !important; }}
     .sla-card-label {{
-        font-size: 0.78rem;
-        color: #aaaaaa;
-        margin: 0 0 10px 0;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: .06em;
+        font-size: 0.78rem; color: #aaaaaa; margin: 0 0 10px 0;
+        font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
     }}
-    .sla-card-value {{
-        font-size: 2.2rem;
-        font-weight: 800;
-        margin: 0 0 8px 0;
-        line-height: 1;
-    }}
-    .sla-card-delta {{
-        font-size: 0.8rem;
-        font-weight: 700;
-        letter-spacing: .03em;
-    }}
+    .sla-card-value {{ font-size: 2.2rem; font-weight: 800; margin: 0 0 8px 0; line-height: 1; }}
+    .sla-card-delta {{ font-size: 0.8rem; font-weight: 700; letter-spacing: .03em; }}
     .sla-faixa-titulo {{
-        font-size: 0.78rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: .07em;
-        color: #aaaaaa;
-        margin: 1rem 0 0.6rem 0;
+        font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: .07em; color: #aaaaaa; margin: 1rem 0 0.6rem 0;
     }}
+    /* stats bar */
+    .sla-stats-bar {{
+        display: flex;
+        align-items: center;
+        gap: 0;
+        background: #1a1d24;
+        border: 1px solid #3a3d4a;
+        border-radius: 0.75em;
+        padding: 14px 22px;
+        margin-top: 0.8rem;
+        flex-wrap: wrap;
+    }}
+    .sla-stat {{
+        display: flex; flex-direction: column; align-items: center;
+        flex: 1; min-width: 110px;
+    }}
+    .sla-stat-sep {{ color: #444; font-size: 1.4rem; padding: 0 4px; align-self: center; }}
+    .sla-stat-label {{
+        font-size: 0.68rem; color: #888; font-weight: 700;
+        text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px;
+    }}
+    .sla-stat-val {{ font-size: 1.25rem; font-weight: 800; line-height: 1.1; }}
+    .sla-stat-sub {{ font-size: 0.7rem; color: #888; margin-top: 2px; }}
     </style>
     <div class="sla-grid">{items}</div>
     <p class="sla-faixa-titulo">&#x23F1; Distribuicao por Tempo em Processo</p>
     <div class="sla-fgrid">{fitens}</div>
+    <div class="sla-stats-bar">{stat_itens}</div>
     """, unsafe_allow_html=True)
 
     st.markdown("---")
