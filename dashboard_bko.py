@@ -700,11 +700,81 @@ def tab_geral(df: pd.DataFrame):
 def tab_sla_processo(df: pd.DataFrame):
     st.subheader(f"Tickets Em Processo / Abertos — {len(df):,}")
 
-    alertas = (df["sla_alerta"] == "SIM").sum()
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Tickets ativos",    f"{len(df):,}")
-    c2.metric("SLA estourado",     f"{alertas:,}", delta_color="inverse")
-    c3.metric("Mais antigo",       _fmt_h(df["tempo_processo_h"].max()))
+    alertas  = int((df["sla_alerta"] == "SIM").sum())
+    total    = len(df)
+    max_h    = df["tempo_processo_h"].max()
+    idx_max  = df["tempo_processo_h"].idxmax() if total else None
+    id_antigo = str(df.loc[idx_max, "ticket_id"]) if idx_max is not None else "—"
+
+    def pct(n: int) -> str:
+        return f"{n / total * 100:.1f}% dos ativos" if total else "—"
+
+    cards = [
+        ("Tickets Ativos",  f"{total:,}",       "",                   COR_ALERTA),
+        ("SLA Estourado",   f"{alertas:,}",      pct(alertas),         COR_ALERTA),
+        ("Mais Antigo",     _fmt_h(max_h),       f"#{id_antigo}",      COR_ALERTA),
+    ]
+
+    items = ""
+    for label, value, sub, color in cards:
+        sub_html = (
+            f'<span class="sla-delta" style="color:{color};">{sub}</span>'
+            if sub else '<span class="sla-delta">&nbsp;</span>'
+        )
+        items += f"""
+        <div class="sla-card" style="--c:{color}; border-color:{color}; box-shadow:0 5px 0 {color};">
+            <p class="sla-label">{label}</p>
+            <p class="sla-value" style="color:{color};">{value}</p>
+            {sub_html}
+        </div>"""
+
+    st.markdown(f"""
+    <style>
+    .sla-grid {{
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+        margin-bottom: 1.6rem;
+    }}
+    .sla-card {{
+        border-radius: 0.75em;
+        border: 2px solid;
+        padding: 20px 22px 16px;
+        background: #262730;
+        cursor: default;
+        transform: translateY(-3px);
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }}
+    .sla-card:hover {{
+        transform: translateY(-6px);
+        box-shadow: 0 8px 0 var(--c) !important;
+    }}
+    .sla-card:active {{
+        transform: translateY(2px);
+        box-shadow: 0 1px 0 var(--c) !important;
+    }}
+    .sla-label {{
+        font-size: 0.72rem;
+        color: #aaaaaa;
+        margin: 0 0 10px 0;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .07em;
+    }}
+    .sla-value {{
+        font-size: 2.2rem;
+        font-weight: 800;
+        margin: 0 0 8px 0;
+        line-height: 1;
+    }}
+    .sla-delta {{
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: .03em;
+    }}
+    </style>
+    <div class="sla-grid">{items}</div>
+    """, unsafe_allow_html=True)
 
     st.markdown("---")
 
