@@ -480,16 +480,23 @@ def _fig_to_b64(fig) -> str:
 
 
 def _html_to_pdf(html: str) -> bytes:
-    """Converte HTML para PDF. Tenta WeasyPrint (Linux/Cloud); cai para xhtml2pdf (Windows)."""
+    """Converte HTML para PDF. Tenta WeasyPrint (Linux/Cloud); cai para xhtml2pdf se disponivel."""
     try:
         import weasyprint
         return weasyprint.HTML(string=html).write_pdf()
     except Exception:
+        pass
+    try:
         from xhtml2pdf import pisa
         from io import BytesIO
         buf = BytesIO()
         pisa.CreatePDF(html.encode("utf-8"), dest=buf)
         return buf.getvalue()
+    except Exception:
+        raise RuntimeError(
+            "PDF nao pode ser gerado neste ambiente. "
+            "No Streamlit Cloud o PDF e gerado automaticamente via WeasyPrint."
+        )
 
 
 def _build_pdf(result: dict) -> bytes:
