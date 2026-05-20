@@ -329,30 +329,60 @@ def _pdf_kpi_row(pdf, kpis: list) -> None:
     pdf.set_draw_color(0, 0, 0)
 
 
+def _pdf_chart_img(fig, scale: float = 1.5) -> str:
+    """Exporta figura Plotly para PNG temporario. Retorna caminho do arquivo."""
+    import plotly.io as pio
+    img_bytes = pio.to_image(fig, format="png", scale=scale)
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    tmp.write(img_bytes)
+    tmp.close()
+    return tmp.name
+
+
+def _pdf_chart_label(pdf, title: str) -> None:
+    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_text_color(44, 62, 80)
+    pdf.cell(0, 5, text=title, new_x="LMARGIN", new_y="NEXT")
+
+
+_CHART_STYLE = dict(plot_bgcolor="white", paper_bgcolor="white",
+                    font=dict(size=11), bargap=0.25)
+
+
 def _pdf_add_charts(pdf, result: dict) -> None:
     """Adiciona graficos PNG ao PDF. Silencioso se kaleido nao estiver disponivel."""
     try:
-        import plotly.io as pio
-
-        # Funil mensal
+        # ── Funil Mensal ──────────────────────────────────────────────────
         df_m = result["funil_m"]
         fig1 = px.bar(
             df_m, y="periodo",
             x=["tickets_fechados", "em_processo"],
             barmode="group", orientation="h",
             title="Funil Mensal — Fechados e Em Processo",
-            color_discrete_map={
-                "tickets_fechados": "#2CA02C",
-                "em_processo":      "#FF7F0E",
-            },
+            color_discrete_map={"tickets_fechados": "#2CA02C", "em_processo": "#FF7F0E"},
         )
-        fig1.update_layout(height=380, width=720, margin=dict(t=50, b=30),
-                           legend_title_text="", plot_bgcolor="white",
-                           paper_bgcolor="white")
-        fig1.update_traces(textposition="outside", cliponaxis=False,
-                           texttemplate="%{x}")
+        fig1.update_layout(height=260, width=520, margin=dict(t=40, b=20, l=10, r=10),
+                           legend_title_text="", **_CHART_STYLE)
+        fig1.update_traces(textposition="outside", cliponaxis=False, texttemplate="%{x}")
 
-        # Volume por escritorio
+        # ── Volume por Departamento ───────────────────────────────────────
+        df_dept = result.get("depto", pd.DataFrame())
+        fig4 = None
+        if not df_dept.empty and "departamento" in df_dept.columns:
+            fig4 = px.bar(
+                df_dept.sort_values("total_tickets", ascending=True),
+                x="total_tickets", y="departamento", orientation="h",
+                title="Volume por Departamento",
+                labels={"total_tickets": "Total", "departamento": ""},
+                color="pct_fechado",
+                color_continuous_scale="RdYlGn", range_color=[0, 100],
+                text="total_tickets",
+            )
+            fig4.update_layout(height=260, width=520, margin=dict(t=40, b=20, l=10, r=10),
+                               coloraxis_colorbar_title="% Fechado", **_CHART_STYLE)
+            fig4.update_traces(textposition="outside", cliponaxis=False)
+
+        # ── Volume por Escritorio ─────────────────────────────────────────
         df_e = result["escrit"].sort_values("total_tickets", ascending=True).tail(15)
         fig2 = px.bar(
             df_e, x="total_tickets", y="escritorio", orientation="h",
@@ -360,77 +390,84 @@ def _pdf_add_charts(pdf, result: dict) -> None:
             color="pct_fechado",
             color_continuous_scale="RdYlGn", range_color=[0, 100],
             text="total_tickets",
+            labels={"total_tickets": "Total", "escritorio": ""},
         )
-        fig2.update_layout(height=440, width=720, margin=dict(t=50, b=30),
-                           plot_bgcolor="white", paper_bgcolor="white",
-                           coloraxis_colorbar_title="% Fechado")
+        fig2.update_layout(height=360, width=560, margin=dict(t=40, b=20, l=10, r=80),
+                           coloraxis_colorbar_title="% Fechado", **_CHART_STYLE)
         fig2.update_traces(textposition="outside", cliponaxis=False)
 
-        charts = [
-            ("Funil Mensal de Tickets", fig1),
-            ("Distribuicao por Escritorio", fig2),
-        ]
-
-        # Top 20 tickets em espera (SLA Em Processo)
+        # ── Top 20 Tickets em Espera ──────────────────────────────────────
+        fig3 = None
         df_sla = result.get("sla_p", pd.DataFrame())
         if not df_sla.empty and "tempo_processo_h" in df_sla.columns:
             df_top = df_sla.sort_values("tempo_processo_h", ascending=False).head(20).copy()
-            df_top["label"] = df_top["ticket_id"].astype(str) + " — " + df_top.get("ticket_subject", df_top["ticket_id"].astype(str)).str.slice(0, 30)
+            df_top["label"] = (
+                "#" + df_top["ticket_id"].astype(str) + "  " +
+                df_top["ticket_subject"].str.slice(0, 28)
+            )
             df_top["cor"] = df_top["tempo_processo_h"].apply(
                 lambda h: "#D62728" if h > 24 else ("#FF7F0E" if h > 10 else "#2CA02C")
             )
             fig3 = px.bar(
                 df_top.sort_values("tempo_processo_h", ascending=True),
                 x="tempo_processo_h", y="label", orientation="h",
-                title="Top 20 Tickets com Maior Tempo em Espera (horas)",
+                title="Top 20 Tickets com Maior Tempo em Espera (h)",
                 labels={"tempo_processo_h": "Horas", "label": ""},
-                color="cor",
-                color_discrete_map="identity",
+                color="cor", color_discrete_map="identity",
                 text_auto=".1f",
             )
-            fig3.update_layout(height=480, width=720, margin=dict(t=50, b=30),
-                               plot_bgcolor="white", paper_bgcolor="white",
-                               showlegend=False)
+            fig3.update_layout(height=400, width=580, margin=dict(t=40, b=20, l=10, r=20),
+                               showlegend=False, **_CHART_STYLE)
             fig3.update_traces(textposition="outside", cliponaxis=False)
-            charts.append(("Top 20 Tickets em Espera", fig3))
 
-        # Volume por departamento
-        df_dept = result.get("depto", pd.DataFrame())
-        if not df_dept.empty and "departamento" in df_dept.columns:
-            fig4 = px.bar(
-                df_dept.sort_values("total_tickets", ascending=True),
-                x="total_tickets", y="departamento", orientation="h",
-                title="Volume de Tickets por Departamento",
-                labels={"total_tickets": "Total", "departamento": ""},
-                color="pct_fechado",
-                color_continuous_scale="RdYlGn", range_color=[0, 100],
-                text="total_tickets",
-            )
-            fig4.update_layout(height=400, width=720, margin=dict(t=50, b=30),
-                               plot_bgcolor="white", paper_bgcolor="white",
-                               coloraxis_colorbar_title="% Fechado")
-            fig4.update_traces(textposition="outside", cliponaxis=False)
-            charts.append(("Volume por Departamento", fig4))
-
+        # ── Montar paginas ────────────────────────────────────────────────
         pdf.add_page()
         _section_title(pdf, "Graficos")
+        pdf.ln(2)
 
-        for title_fig, fig in charts:
-            img_bytes = pio.to_image(fig, format="png", scale=1.5)
-            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-                tmp.write(img_bytes)
-                tmp_path = tmp.name
+        # Pagina graficos 1: Funil + Departamento lado a lado
+        tmp1 = _pdf_chart_img(fig1)
+        tmp4 = _pdf_chart_img(fig4) if fig4 is not None else None
+        try:
+            col_w = 88
+            x0 = pdf.l_margin
+            y0 = pdf.get_y()
+            _pdf_chart_label(pdf, "Funil Mensal de Tickets")
+            pdf.image(tmp1, x=x0, w=col_w)
+            if tmp4:
+                pdf.set_xy(x0 + col_w + 4, y0)
+                _pdf_chart_label(pdf, "Volume por Departamento")
+                pdf.image(tmp4, x=x0 + col_w + 4, y=y0 + 6, w=col_w)
+        finally:
+            Path(tmp1).unlink(missing_ok=True)
+            if tmp4:
+                Path(tmp4).unlink(missing_ok=True)
+
+        # Avanca apos os dois graficos lado a lado
+        pdf.ln(4)
+
+        # Volume por Escritorio — largura total
+        pdf.add_page()
+        _section_title(pdf, "Volume por Escritorio")
+        pdf.ln(2)
+        tmp2 = _pdf_chart_img(fig2)
+        try:
+            _pdf_chart_label(pdf, "Top 15 Escritorios por Volume")
+            pdf.image(tmp2, w=170)
+        finally:
+            Path(tmp2).unlink(missing_ok=True)
+
+        # Top 20 em espera — largura total
+        if fig3 is not None:
+            pdf.add_page()
+            _section_title(pdf, "Tickets em Espera")
+            pdf.ln(2)
+            tmp3 = _pdf_chart_img(fig3)
             try:
-                # Nova pagina se nao ha espaco suficiente
-                if pdf.get_y() > pdf.h - 90:
-                    pdf.add_page()
-                pdf.set_font("Helvetica", "B", 9)
-                pdf.set_text_color(60, 60, 60)
-                pdf.cell(0, 6, text=title_fig, new_x="LMARGIN", new_y="NEXT")
-                pdf.image(tmp_path, w=180)
-                pdf.ln(8)
+                _pdf_chart_label(pdf, "Top 20 Tickets com Maior Tempo em Aberto")
+                pdf.image(tmp3, w=170)
             finally:
-                Path(tmp_path).unlink(missing_ok=True)
+                Path(tmp3).unlink(missing_ok=True)
 
     except Exception as exc:
         _log(f"Graficos no PDF ignorados: {exc}")
