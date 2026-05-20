@@ -709,33 +709,47 @@ def tab_sla_processo(df: pd.DataFrame):
     def pct(n: int) -> str:
         return f"{n / total * 100:.1f}% dos ativos" if total else "—"
 
+    # faixas de tempo
+    f_ok   = int((df["tempo_processo_h"] <= 10).sum())
+    f_med  = int(((df["tempo_processo_h"] > 10) & (df["tempo_processo_h"] <= 24)).sum())
+    f_crit = int((df["tempo_processo_h"] > 24).sum())
+
     cards = [
-        ("Tickets Ativos",  f"{total:,}",       "",                   COR_ALERTA),
-        ("SLA Estourado",   f"{alertas:,}",      pct(alertas),         COR_ALERTA),
-        ("Mais Antigo",     _fmt_h(max_h),       f"#{id_antigo}",      COR_ALERTA),
+        ("Tickets Ativos",  f"{total:,}",   "",            COR_ALERTA),
+        ("SLA Estourado",   f"{alertas:,}", pct(alertas),  COR_ALERTA),
+        ("Mais Antigo",     _fmt_h(max_h),  f"#{id_antigo}", COR_ALERTA),
     ]
 
-    items = ""
-    for label, value, sub, color in cards:
+    faixas = [
+        ("✅  Ate 10h",      f"{f_ok:,}",   pct(f_ok),   COR_FECHADO),
+        ("⚠️  10h — 24h",   f"{f_med:,}",  pct(f_med),  COR_PROCESSO),
+        ("🚨  Acima de 24h", f"{f_crit:,}", pct(f_crit), COR_ALERTA),
+    ]
+
+    def _card_html(label, value, sub, color, css_class):
         sub_html = (
-            f'<span class="sla-delta" style="color:{color};">{sub}</span>'
-            if sub else '<span class="sla-delta">&nbsp;</span>'
+            f'<span class="{css_class}-delta" style="color:{color};">{sub}</span>'
+            if sub else f'<span class="{css_class}-delta">&nbsp;</span>'
         )
-        items += f"""
-        <div class="sla-card" style="--c:{color}; border-color:{color}; box-shadow:0 5px 0 {color};">
-            <p class="sla-label">{label}</p>
-            <p class="sla-value" style="color:{color};">{value}</p>
+        return f"""
+        <div class="{css_class}" style="--c:{color}; border-color:{color}; box-shadow:0 5px 0 {color};">
+            <p class="{css_class}-label">{label}</p>
+            <p class="{css_class}-value" style="color:{color};">{value}</p>
             {sub_html}
         </div>"""
 
+    items  = "".join(_card_html(*c, "sla-card")  for c in cards)
+    fitens = "".join(_card_html(*f, "sla-card") for f in faixas)
+
     st.markdown(f"""
     <style>
-    .sla-grid {{
+    .sla-grid, .sla-fgrid {{
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         gap: 18px;
-        margin-bottom: 1.6rem;
     }}
+    .sla-grid {{ margin-bottom: 0.6rem; }}
+    .sla-fgrid {{ margin-bottom: 1.6rem; }}
     .sla-card {{
         border-radius: 0.75em;
         border: 2px solid;
@@ -745,35 +759,39 @@ def tab_sla_processo(df: pd.DataFrame):
         transform: translateY(-3px);
         transition: transform 0.12s ease, box-shadow 0.12s ease;
     }}
-    .sla-card:hover {{
-        transform: translateY(-6px);
-        box-shadow: 0 8px 0 var(--c) !important;
-    }}
-    .sla-card:active {{
-        transform: translateY(2px);
-        box-shadow: 0 1px 0 var(--c) !important;
-    }}
-    .sla-label {{
-        font-size: 0.72rem;
+    .sla-card:hover  {{ transform: translateY(-6px); box-shadow: 0 8px 0 var(--c) !important; }}
+    .sla-card:active {{ transform: translateY(2px);  box-shadow: 0 1px 0 var(--c) !important; }}
+    .sla-card-label {{
+        font-size: 0.78rem;
         color: #aaaaaa;
         margin: 0 0 10px 0;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: .07em;
+        letter-spacing: .06em;
     }}
-    .sla-value {{
+    .sla-card-value {{
         font-size: 2.2rem;
         font-weight: 800;
         margin: 0 0 8px 0;
         line-height: 1;
     }}
-    .sla-delta {{
+    .sla-card-delta {{
         font-size: 0.8rem;
         font-weight: 700;
         letter-spacing: .03em;
     }}
+    .sla-faixa-titulo {{
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .07em;
+        color: #aaaaaa;
+        margin: 1rem 0 0.6rem 0;
+    }}
     </style>
     <div class="sla-grid">{items}</div>
+    <p class="sla-faixa-titulo">&#x23F1; Distribuicao por Tempo em Processo</p>
+    <div class="sla-fgrid">{fitens}</div>
     """, unsafe_allow_html=True)
 
     st.markdown("---")
