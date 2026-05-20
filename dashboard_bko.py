@@ -709,130 +709,38 @@ def tab_sla_processo(df: pd.DataFrame):
     def pct(n: int) -> str:
         return f"{n / total * 100:.1f}% dos ativos" if total else "—"
 
-    # faixas de tempo
-    f_ok   = int((df["tempo_processo_h"] <= 10).sum())
-    f_med  = int(((df["tempo_processo_h"] > 10) & (df["tempo_processo_h"] <= 24)).sum())
-    f_crit = int((df["tempo_processo_h"] > 24).sum())
-
     cards = [
-        ("Tickets Ativos",  f"{total:,}",   "",            COR_ALERTA),
-        ("SLA Estourado",   f"{alertas:,}", pct(alertas),  COR_ALERTA),
-        ("Mais Antigo",     _fmt_h(max_h),  f"#{id_antigo}", COR_ALERTA),
+        ("Tickets Ativos", f"{total:,}",    "",              COR_ALERTA),
+        ("SLA Estourado",  f"{alertas:,}",  pct(alertas),    COR_ALERTA),
+        ("Mais Antigo",    _fmt_h(max_h),   f"#{id_antigo}", COR_ALERTA),
     ]
 
-    faixas = [
-        ("✅  Ate 10h",      f"{f_ok:,}",   pct(f_ok),   COR_FECHADO),
-        ("⚠️  10h — 24h",   f"{f_med:,}",  pct(f_med),  COR_PROCESSO),
-        ("🚨  Acima de 24h", f"{f_crit:,}", pct(f_crit), COR_ALERTA),
-    ]
-
-    def _card_html(label, value, sub, color, css_class):
+    def _card_html(label, value, sub, color):
         sub_html = (
-            f'<span class="{css_class}-delta" style="color:{color};">{sub}</span>'
-            if sub else f'<span class="{css_class}-delta">&nbsp;</span>'
+            f'<span class="sla-card-delta" style="color:{color};">{sub}</span>'
+            if sub else '<span class="sla-card-delta">&nbsp;</span>'
         )
-        return f"""
-        <div class="{css_class}" style="--c:{color}; border-color:{color}; box-shadow:0 5px 0 {color};">
-            <p class="{css_class}-label">{label}</p>
-            <p class="{css_class}-value" style="color:{color};">{value}</p>
-            {sub_html}
-        </div>"""
-
-    # stats para diagnóstico
-    t_min = df["tempo_processo_h"].min()
-    t_avg = df["tempo_processo_h"].mean()
-    t_p50 = df["tempo_processo_h"].median()
-    t_p90 = df["tempo_processo_h"].quantile(0.90)
-    idx_min  = df["tempo_processo_h"].idxmin() if total else None
-    id_novo  = str(df.loc[idx_min, "ticket_id"]) if idx_min is not None else "—"
-
-    def _stat_color(h):
-        if pd.isna(h):      return "#aaaaaa"
-        if h <= 10:         return COR_FECHADO
-        if h <= 24:         return COR_PROCESSO
-        return COR_ALERTA
-
-    stats = [
-        ("🕐 Mais Recente",  _fmt_h(t_min), f"#{id_novo}", _stat_color(t_min)),
-        ("📊 Media",         _fmt_h(t_avg), "",             _stat_color(t_avg)),
-        ("📈 Mediana (P50)", _fmt_h(t_p50), "",             _stat_color(t_p50)),
-        ("🔝 P90",           _fmt_h(t_p90), "",             _stat_color(t_p90)),
-    ]
-
-    stat_parts = []
-    for lbl, val, sub, cor in stats:
-        stat_parts.append(
-            '<div class="sla-stat">'
-            f'<span class="sla-stat-label">{lbl}</span>'
-            f'<span class="sla-stat-val" style="color:{cor};">{val}</span>'
-            f'<span class="sla-stat-sub">{sub}</span>'
-            '</div>'
+        return (
+            f'<div class="sla-card" style="--c:{color}; border-color:{color}; box-shadow:0 5px 0 {color};">'
+            f'<p class="sla-card-label">{label}</p>'
+            f'<p class="sla-card-value" style="color:{color};">{value}</p>'
+            f'{sub_html}</div>'
         )
-    stat_itens = "".join(stat_parts)
 
-    items  = "".join(_card_html(*c, "sla-card") for c in cards)
-    fitens = "".join(_card_html(*f, "sla-card") for f in faixas)
+    items = "".join(_card_html(*c) for c in cards)
 
     st.markdown(f"""
     <style>
-    .sla-grid, .sla-fgrid {{
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 18px;
-    }}
-    .sla-grid  {{ margin-bottom: 0.6rem; }}
-    .sla-fgrid {{ margin-bottom: 0.8rem; }}
-    .sla-card {{
-        border-radius: 0.75em;
-        border: 2px solid;
-        padding: 20px 22px 16px;
-        background: #262730;
-        cursor: default;
-        transform: translateY(-3px);
-        transition: transform 0.12s ease, box-shadow 0.12s ease;
-    }}
+    .sla-grid {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-bottom: 1.6rem; }}
+    .sla-card {{ border-radius: 0.75em; border: 2px solid; padding: 20px 22px 16px; background: #262730;
+        cursor: default; transform: translateY(-3px); transition: transform 0.12s ease, box-shadow 0.12s ease; }}
     .sla-card:hover  {{ transform: translateY(-6px); box-shadow: 0 8px 0 var(--c) !important; }}
     .sla-card:active {{ transform: translateY(2px);  box-shadow: 0 1px 0 var(--c) !important; }}
-    .sla-card-label {{
-        font-size: 0.78rem; color: #aaaaaa; margin: 0 0 10px 0;
-        font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
-    }}
+    .sla-card-label {{ font-size: 0.78rem; color: #aaaaaa; margin: 0 0 10px 0; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }}
     .sla-card-value {{ font-size: 2.2rem; font-weight: 800; margin: 0 0 8px 0; line-height: 1; }}
     .sla-card-delta {{ font-size: 0.8rem; font-weight: 700; letter-spacing: .03em; }}
-    .sla-faixa-titulo {{
-        font-size: 0.78rem; font-weight: 700; text-transform: uppercase;
-        letter-spacing: .07em; color: #aaaaaa; margin: 1rem 0 0.6rem 0;
-    }}
-    /* stats bar */
-    .sla-stats-bar {{
-        display: flex;
-        align-items: center;
-        gap: 0;
-        background: #1a1d24;
-        border: 1px solid #3a3d4a;
-        border-radius: 0.75em;
-        padding: 14px 22px;
-        margin-top: 0.8rem;
-        flex-wrap: wrap;
-    }}
-    .sla-stat {{
-        display: flex; flex-direction: column; align-items: center;
-        flex: 1; min-width: 110px;
-        border-right: 1px solid #3a3d4a;
-        padding: 0 16px;
-    }}
-    .sla-stat:last-child {{ border-right: none; }}
-    .sla-stat-label {{
-        font-size: 0.68rem; color: #888; font-weight: 700;
-        text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px;
-    }}
-    .sla-stat-val {{ font-size: 1.25rem; font-weight: 800; line-height: 1.1; }}
-    .sla-stat-sub {{ font-size: 0.7rem; color: #888; margin-top: 2px; }}
     </style>
     <div class="sla-grid">{items}</div>
-    <p class="sla-faixa-titulo">&#x23F1; Distribuicao por Tempo em Processo</p>
-    <div class="sla-fgrid">{fitens}</div>
-    <div class="sla-stats-bar">{stat_itens}</div>
     """, unsafe_allow_html=True)
 
     st.markdown("---")
@@ -893,12 +801,78 @@ def tab_sla_processo(df: pd.DataFrame):
 def tab_sla_resposta(df: pd.DataFrame):
     st.subheader(f"SLA Resposta BO -> BP — {len(df):,} tickets")
 
-    desc = df["tempo_resposta_h"].describe(percentiles=[.50, .75, .90, .95])
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Media",   _fmt_h(desc["mean"]))
-    c2.metric("Mediana", _fmt_h(desc["50%"]))
-    c3.metric("P90",     _fmt_h(desc["90%"]))
-    c4.metric("Maximo",  _fmt_h(desc["max"]))
+    desc   = df["tempo_resposta_h"].describe(percentiles=[.50, .75, .90, .95])
+    total  = len(df)
+
+    def _resp_color(h):
+        if pd.isna(h): return "#aaaaaa"
+        if h <= 10:    return COR_FECHADO
+        if h <= 24:    return COR_PROCESSO
+        return COR_ALERTA
+
+    def _resp_card(label, value, color):
+        return (
+            f'<div class="resp-card" style="--c:{color}; border-color:{color}; box-shadow:0 5px 0 {color};">'
+            f'<p class="resp-card-label">{label}</p>'
+            f'<p class="resp-card-value" style="color:{color};">{value}</p>'
+            f'</div>'
+        )
+
+    # linha de estatísticas
+    stat_cards = [
+        ("Media",    _fmt_h(desc["mean"]), _resp_color(desc["mean"])),
+        ("Mediana",  _fmt_h(desc["50%"]),  _resp_color(desc["50%"])),
+        ("P90",      _fmt_h(desc["90%"]),  _resp_color(desc["90%"])),
+        ("Maximo",   _fmt_h(desc["max"]),  _resp_color(desc["max"])),
+    ]
+
+    # faixas de tempo de resposta
+    f_ok   = int((df["tempo_resposta_h"] <= 10).sum())
+    f_med  = int(((df["tempo_resposta_h"] > 10) & (df["tempo_resposta_h"] <= 24)).sum())
+    f_crit = int((df["tempo_resposta_h"] > 24).sum())
+
+    def pct(n: int) -> str:
+        return f"{n / total * 100:.1f}% das respostas" if total else "—"
+
+    faixa_cards = [
+        ("✅  Respondido ate 10h",    f"{f_ok:,}",   pct(f_ok),   COR_FECHADO),
+        ("⚠️  Respondido 10h — 24h", f"{f_med:,}",  pct(f_med),  COR_PROCESSO),
+        ("🚨  Respondido acima 24h",  f"{f_crit:,}", pct(f_crit), COR_ALERTA),
+    ]
+
+    def _faixa_card(label, value, sub, color):
+        return (
+            f'<div class="resp-card" style="--c:{color}; border-color:{color}; box-shadow:0 5px 0 {color};">'
+            f'<p class="resp-card-label">{label}</p>'
+            f'<p class="resp-card-value" style="color:{color};">{value}</p>'
+            f'<span class="resp-card-delta" style="color:{color};">{sub}</span>'
+            f'</div>'
+        )
+
+    stat_html  = "".join(_resp_card(*c)    for c in stat_cards)
+    faixa_html = "".join(_faixa_card(*c)   for c in faixa_cards)
+
+    st.markdown(f"""
+    <style>
+    .resp-grid4 {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 0.8rem; }}
+    .resp-grid3 {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-bottom: 1.6rem; }}
+    .resp-card {{
+        border-radius: 0.75em; border: 2px solid; padding: 18px 20px 14px;
+        background: #262730; cursor: default;
+        transform: translateY(-3px); transition: transform 0.12s ease, box-shadow 0.12s ease;
+    }}
+    .resp-card:hover  {{ transform: translateY(-6px); box-shadow: 0 8px 0 var(--c) !important; }}
+    .resp-card:active {{ transform: translateY(2px);  box-shadow: 0 1px 0 var(--c) !important; }}
+    .resp-card-label {{ font-size: 0.75rem; color: #aaaaaa; margin: 0 0 8px 0; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }}
+    .resp-card-value {{ font-size: 2rem; font-weight: 800; margin: 0 0 6px 0; line-height: 1; }}
+    .resp-card-delta {{ font-size: 0.8rem; font-weight: 700; }}
+    .resp-faixa-titulo {{ font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: .07em; color: #aaaaaa; margin: 0.2rem 0 0.6rem 0; }}
+    </style>
+    <div class="resp-grid4">{stat_html}</div>
+    <p class="resp-faixa-titulo">&#x23F1; Distribuicao por Tempo de Resposta</p>
+    <div class="resp-grid3">{faixa_html}</div>
+    """, unsafe_allow_html=True)
 
     st.markdown("---")
 
