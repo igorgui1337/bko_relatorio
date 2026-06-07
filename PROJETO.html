@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>BKO Tickets — Documentação do Projeto</title>
+<style>
+  :root {
+    --bg:      #0e1117;
+    --card:    #1e2130;
+    --border:  #2e3250;
+    --text:    #e8eaf0;
+    --muted:   #8b90a8;
+    --accent:  #4a9eff;
+    --green:   #2CA02C;
+    --orange:  #FF7F0E;
+    --blue:    #1F77B4;
+    --red:     #D62728;
+    --navy:    #1F3864;
+    --code-bg: #161b2e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 15px; line-height: 1.65;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Layout */
+  .sidebar {
+    position: fixed; top: 0; left: 0; width: 260px; height: 100vh;
+    background: #070b14; border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 24px 16px; z-index: 100;
+  }
+  .sidebar h2 { font-size: 0.85rem; color: var(--muted); text-transform: uppercase;
+                letter-spacing: 1px; margin: 20px 0 8px; }
+  .sidebar a {
+    display: block; padding: 5px 10px; border-radius: 5px;
+    color: var(--muted); font-size: 0.88rem; margin-bottom: 2px;
+  }
+  .sidebar a:hover { background: var(--card); color: var(--text); text-decoration: none; }
+  .sidebar .logo { font-size: 1.1rem; font-weight: 700; color: var(--text);
+                   margin-bottom: 4px; }
+  .sidebar .version { font-size: 0.75rem; color: var(--muted); margin-bottom: 16px; }
+  .main { margin-left: 260px; padding: 40px 48px; max-width: 1100px; }
+
+  /* Cover */
+  .cover {
+    background: linear-gradient(135deg, #1F3864 0%, #2c4a8c 100%);
+    border-radius: 12px; padding: 40px 36px 32px;
+    margin-bottom: 40px;
+  }
+  .cover h1 { font-size: 2.4rem; font-weight: 800; margin-bottom: 6px; }
+  .cover p { font-size: 1.05rem; opacity: .8; margin-bottom: 16px; }
+  .badges { display: flex; gap: 10px; flex-wrap: wrap; }
+  .badge {
+    background: rgba(255,255,255,.12); border-radius: 20px;
+    padding: 4px 14px; font-size: 0.8rem; color: #cde;
+  }
+
+  /* Section headings */
+  h2.sec {
+    font-size: 1.5rem; font-weight: 700; margin: 48px 0 16px;
+    padding-bottom: 8px; border-bottom: 2px solid var(--border);
+    color: var(--text);
+  }
+  h3.sub {
+    font-size: 1.1rem; font-weight: 600; margin: 28px 0 12px;
+    color: var(--accent);
+  }
+
+  /* Pipeline boxes */
+  .pipeline {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 24px; margin: 16px 0;
+    font-family: "Cascadia Code", "Fira Code", monospace; font-size: 0.88rem;
+    color: #c8d0e8; white-space: pre; overflow-x: auto; line-height: 1.8;
+  }
+
+  /* Cards grid */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr));
+           gap: 14px; margin: 16px 0; }
+  .card {
+    background: var(--card); border-radius: 8px; padding: 16px;
+    border-top: 3px solid var(--accent);
+  }
+  .card.green  { border-top-color: var(--green);  }
+  .card.orange { border-top-color: var(--orange); }
+  .card.blue   { border-top-color: var(--blue);   }
+  .card.red    { border-top-color: var(--red);    }
+  .card.navy   { border-top-color: #4a7abf;       }
+  .card h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 4px; }
+  .card p  { font-size: 0.8rem; color: var(--muted); }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 0.88rem;
+          margin: 12px 0 24px; }
+  thead th {
+    background: var(--navy); color: #fff;
+    padding: 8px 12px; text-align: left; font-weight: 600;
+  }
+  tbody tr:nth-child(even) { background: rgba(255,255,255,.03); }
+  tbody td { padding: 7px 12px; border-bottom: 1px solid var(--border); }
+  tbody td code { background: var(--code-bg); padding: 1px 6px; border-radius: 3px;
+                  font-size: 0.83rem; }
+
+  /* Code blocks */
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 18px 20px; overflow-x: auto;
+    font-family: "Cascadia Code", "Fira Code", monospace;
+    font-size: 0.85rem; line-height: 1.7; margin: 12px 0 20px;
+    color: #b8c4e0;
+  }
+  code { font-family: "Cascadia Code", "Fira Code", monospace; }
+  p code, li code {
+    background: var(--code-bg); padding: 1px 6px; border-radius: 3px;
+    font-size: 0.85rem; color: #a8d8ff;
+  }
+
+  /* Info boxes */
+  .info {
+    background: #1a2a1a; border-left: 4px solid var(--green);
+    border-radius: 0 6px 6px 0; padding: 12px 16px; margin: 12px 0;
+    font-size: 0.9rem;
+  }
+  .warn {
+    background: #2a1f0a; border-left: 4px solid var(--orange);
+    border-radius: 0 6px 6px 0; padding: 12px 16px; margin: 12px 0;
+    font-size: 0.9rem;
+  }
+
+  /* Tag pills */
+  .pill {
+    display: inline-block; padding: 2px 10px; border-radius: 12px;
+    font-size: 0.75rem; font-weight: 600; margin: 2px;
+  }
+  .pill-green  { background: #1a3a1a; color: #4caf50; }
+  .pill-orange { background: #2a1a0a; color: #ff9800; }
+  .pill-blue   { background: #0a1a2a; color: #64b5f6; }
+  .pill-red    { background: #2a0a0a; color: #ef5350; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #070b14; }
+  ::-webkit-scrollbar-thumb { background: #2e3250; border-radius: 3px; }
+
+  /* Print */
+  @media print {
+    .sidebar { display: none; }
+    .main { margin-left: 0; padding: 20px; }
+    body { background: white; color: #111; }
+    pre { background: #f5f5f5; color: #111; border: 1px solid #ddd; }
+    .cover { background: #1F3864 !important; -webkit-print-color-adjust: exact; }
+    thead th { background: #1F3864 !important; -webkit-print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="logo">📊 BKO Tickets</div>
+  <div class="version">igorgui1337/bko_relatorio · master</div>
+  <h2>Navegação</h2>
+  <a href="#overview">Visão Geral</a>
+  <a href="#pipeline">Pipeline</a>
+  <a href="#estrutura">Estrutura de Arquivos</a>
+  <h2>Módulos</h2>
+  <a href="#validador">validador_tabela_ticket.py</a>
+  <a href="#processador">processador_relatorio_data.py</a>
+  <a href="#dashboard">dashboard_bko.py</a>
+  <h2>Referências</h2>
+  <a href="#departamentos">Departamentos.xlsx</a>
+  <a href="#email">Configuração E-mail</a>
+  <a href="#deps">Dependências</a>
+  <a href="#run">Como Rodar</a>
+  <a href="#react">Replicar em React</a>
+</nav>
+
+<!-- Main Content -->
+<main class="main">
+
+  <!-- Cover -->
+  <div class="cover">
+    <h1>BKO Tickets</h1>
+    <p>Dashboard de análise de tickets de suporte — documentação completa para replicação do projeto</p>
+    <div class="badges">
+      <span class="badge">Python 3.10+</span>
+      <span class="badge">Streamlit 1.57</span>
+      <span class="badge">Plotly</span>
+      <span class="badge">pandas</span>
+      <span class="badge">WeasyPrint</span>
+      <span class="badge">Streamlit Cloud</span>
+    </div>
+  </div>
+
+  <!-- Visão Geral -->
+  <h2 class="sec" id="overview">Visão Geral</h2>
+  <p>Sistema de análise de tickets de suporte BKO. Recebe um CSV exportado do sistema de tickets, executa ETL, gera indicadores e exibe um dashboard interativo com export HTML/PDF e envio por e-mail.</p>
+
+  <div class="cards" style="margin-top:20px">
+    <div class="card navy">
+      <h4>📥 Upload</h4>
+      <p>CSV ou XLSX exportado do sistema de tickets</p>
+    </div>
+    <div class="card blue">
+      <h4>⚙️ ETL</h4>
+      <p>Detecção de encoding, divisão de datas, validação</p>
+    </div>
+    <div class="card orange">
+      <h4>📊 Análise</h4>
+      <p>Consolidação por ticket, SLA, funil, departamentos</p>
+    </div>
+    <div class="card green">
+      <h4>🌐 Export</h4>
+      <p>HTML interativo, PDF via WeasyPrint, e-mail SMTP</p>
+    </div>
+  </div>
+
+  <!-- Pipeline -->
+  <h2 class="sec" id="pipeline">Pipeline Completo</h2>
+  <div class="pipeline">CSV Upload (Streamlit)
+        │
+        ▼
+[1] validador_tabela_ticket.py
+        │  - detecta encoding (latin-1, utf-8, cp1252, utf-8-sig)
+        │  - separa colunas data+hora em duas colunas
+        │  - valida colunas obrigatórias
+        │  - corrige double-encoding (ex: Ã§ → ç)
+        │  → DataFrame limpo + lista de avisos
+        │
+        ▼
+[2] processador_relatorio_data.py
+        │  - agrupa N linhas por ticket → 1 registro consolidado
+        │  - calcula SLA (tempo_processo_h, tempo_resposta_h)
+        │  - detecta alertas SLA > 24h
+        │  - conta transferências de responsável
+        │  - cruza com Departamentos.xlsx (LEFT JOIN por ticket_subject)
+        │  → dict com 8 DataFrames + bytes do XLSX
+        │
+        ▼
+[3] dashboard_bko.py
+           - 7 abas de análise
+           - export HTML interativo (Plotly JS CDN)
+           - export PDF (WeasyPrint / xhtml2pdf fallback)
+           - envio e-mail com XLSX + HTML em anexo</div>
+
+  <!-- Estrutura -->
+  <h2 class="sec" id="estrutura">Estrutura de Arquivos</h2>
+  <pre>bko_tickets/
+├── dashboard_bko.py              # App principal Streamlit
+├── processador_relatorio_data.py # ETL + geração de análises
+├── validador_tabela_ticket.py    # Leitura e limpeza do CSV
+├── Departamentos.xlsx            # DB mapeamento assunto → departamento
+├── requirements.txt              # Dependências Python
+├── packages.txt                  # Dependências de sistema (Streamlit Cloud)
+├── rodar_dashboard.bat           # Atalho Windows
+├── .streamlit/
+│   └── secrets.toml              # Credenciais SMTP (nunca versionar)
+└── .gitignore                    # *.csv, *.xlsx exceto Departamentos.xlsx</pre>
+
+  <!-- Validador -->
+  <h2 class="sec" id="validador">Módulo 1 — validador_tabela_ticket.py</h2>
+  <p>Responsável pelo ETL do arquivo bruto de entrada. Detecta encoding, corrige caracteres, divide colunas de data+hora e valida a integridade dos dados.</p>
+
+  <h3 class="sub">Constantes</h3>
+  <pre>DATETIME_COLS = [
+    ("open_at",             "hora_open"),
+    ("answered_at",         "answered_hora"),
+    ("message_at",          "message_hora"),
+    ("previous_message_at", "previous_hora"),
+]
+ENCODING_CANDIDATES = ["latin-1", "utf-8", "cp1252", "utf-8-sig"]
+REQUIRED_COLS = {"ticket_id", "ticket_subject", "open_at", "status"}</pre>
+
+  <h3 class="sub">Funções</h3>
+  <table>
+    <thead><tr><th>Função</th><th>Assinatura</th><th>O que faz</th></tr></thead>
+    <tbody>
+      <tr><td><code>read_csv_auto</code></td><td><code>(path) → (DataFrame, str)</code></td><td>Tenta ler CSV com 4 encodings. Rejeita se colunas tiverem caracteres quebrados</td></tr>
+      <tr><td><code>read_xlsx_file</code></td><td><code>(path, sheet=0) → (DataFrame, str)</code></td><td>Lê primeira aba do XLSX, normaliza nomes de colunas</td></tr>
+      <tr><td><code>read_any_file</code></td><td><code>(path) → (DataFrame, str)</code></td><td>Roteador: detecta CSV ou XLSX pelo sufixo</td></tr>
+      <tr><td><code>_fix_residual_chars</code></td><td><code>(series) → series</code></td><td>Corrige double-encoding residual (ex: Ã§ → ç)</td></tr>
+      <tr><td><code>_detect_datetime_format</code></td><td><code>(series) → 'br'/'iso'/None</code></td><td>Detecta formato BR (DD/MM/YYYY) ou ISO (YYYY-MM-DD)</td></tr>
+      <tr><td><code>split_datetime_columns</code></td><td><code>(df) → (df, list[str])</code></td><td>Separa colunas data+hora em duas colunas separadas</td></tr>
+      <tr><td><code>validate</code></td><td><code>(df) → list[str]</code></td><td>Retorna lista de avisos de qualidade (lista vazia = OK)</td></tr>
+      <tr><td><code>process_file</code></td><td><code>(input, output=None) → str</code></td><td>Pipeline completo: lê → corrige → divide → valida → salva CSV ETL</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">Colunas divididas pelo ETL</h3>
+  <pre>open_at              →  open_at       +  hora_open
+answered_at          →  answered_at   +  answered_hora
+message_at           →  message_at    +  message_hora
+previous_message_at  →  previous_message_at  +  previous_hora</pre>
+
+  <!-- Processador -->
+  <h2 class="sec" id="processador">Módulo 2 — processador_relatorio_data.py</h2>
+  <p>Consolida N linhas por ticket em 1 registro e gera todas as análises analíticas + XLSX formatado.</p>
+
+  <h3 class="sub">Constantes</h3>
+  <pre>SLA_ALERTA_H = 24          # horas — acima disso gera alerta
+AGORA = datetime.now()     # referência para tickets ainda abertos
+
+# Cores XLSX
+HEADER_COLOR  = "1F3864"   # azul escuro (cabeçalho)
+OPEN_COLOR    = "FFF2CC"   # amarelo claro
+PROC_COLOR    = "DEEBF7"   # azul claro
+CLOSED_COLOR  = "E2EFDA"   # verde claro
+ALERT_COLOR   = "FCE4D6"   # laranja</pre>
+
+  <h3 class="sub">Lógica de SLA</h3>
+  <pre># Tempo em processo
+if status in ("open", "processing"):
+    tempo_processo_h = (AGORA - dt_abertura).total_seconds() / 3600
+else:
+    tempo_processo_h = (dt_ultima_msg - dt_abertura).total_seconds() / 3600
+
+# Tempo de resposta BO → BP
+tempo_resposta_h = (dt_resposta - dt_abertura).total_seconds() / 3600
+
+# Alerta
+sla_alerta = "SIM" if tempo_processo_h > 24 and status != "closed" else ""
+
+# Prioridade de status (resolve conflitos)
+# closed > processing > open</pre>
+
+  <h3 class="sub">Campos do registro consolidado (df_geral)</h3>
+  <table>
+    <thead><tr><th>Campo</th><th>Tipo</th><th>Descrição</th></tr></thead>
+    <tbody>
+      <tr><td><code>ticket_id</code></td><td>string</td><td>Identificador único do ticket</td></tr>
+      <tr><td><code>ticket_subject</code></td><td>string</td><td>Categoria/assunto do ticket</td></tr>
+      <tr><td><code>status</code></td><td>open | processing | closed</td><td>Status resolvido por prioridade</td></tr>
+      <tr><td><code>dt_abertura</code></td><td>datetime</td><td>Primeira abertura do ticket</td></tr>
+      <tr><td><code>dt_resposta</code></td><td>datetime | NaT</td><td>Primeira resposta BO → BP</td></tr>
+      <tr><td><code>dt_ultima_atividade</code></td><td>datetime | NaT</td><td>Última mensagem registrada</td></tr>
+      <tr><td><code>tempo_processo_h</code></td><td>float</td><td>Horas desde abertura até agora/fechamento</td></tr>
+      <tr><td><code>tempo_resposta_h</code></td><td>float | None</td><td>Horas até primeira resposta</td></tr>
+      <tr><td><code>sla_alerta</code></td><td>"SIM" | ""</td><td>Alerta se &gt; 24h e não fechado</td></tr>
+      <tr><td><code>n_mensagens</code></td><td>int</td><td>Total de linhas/mensagens do ticket</td></tr>
+      <tr><td><code>n_transferencias</code></td><td>int</td><td>Trocas de responsável detectadas</td></tr>
+      <tr><td><code>analista</code></td><td>string</td><td>Último responsável BO (sender)</td></tr>
+      <tr><td><code>consultor</code></td><td>string</td><td>Último responsável BP (consultant)</td></tr>
+      <tr><td><code>escritorio</code></td><td>string</td><td>Escritório associado</td></tr>
+      <tr><td><code>mes_abertura</code></td><td>"YYYY-MM"</td><td>Mês de abertura para funil</td></tr>
+      <tr><td><code>semana_abertura</code></td><td>"YYYY-SNN"</td><td>Semana ISO de abertura</td></tr>
+      <tr><td><code>departamento</code></td><td>string</td><td>Adicionado após merge com Departamentos.xlsx</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">Funções analíticas</h3>
+  <table>
+    <thead><tr><th>Função</th><th>Agrupamento</th><th>Principais colunas de saída</th></tr></thead>
+    <tbody>
+      <tr><td><code>make_sla_em_processo(df)</code></td><td>Por ticket (open/processing)</td><td>ticket_id, tempo_processo_h, sla_alerta, n_transferencias</td></tr>
+      <tr><td><code>make_sla_resposta(df)</code></td><td>Por ticket (com resposta)</td><td>ticket_id, dt_resposta, tempo_resposta_h</td></tr>
+      <tr><td><code>make_funil_mensal(df)</code></td><td>mes_abertura</td><td>tickets_abertos, tickets_fechados, em_processo, pct_fechado</td></tr>
+      <tr><td><code>make_funil_semanal(df)</code></td><td>semana_abertura</td><td>idem funil mensal</td></tr>
+      <tr><td><code>make_por_assunto(df)</code></td><td>ticket_subject</td><td>total, fechados, em_processo, pct_fechado, n_transferencias_medio</td></tr>
+      <tr><td><code>make_por_escritorio(df)</code></td><td>escritorio</td><td>total_tickets, fechados, pendentes, pct_fechado, pct_pendente</td></tr>
+      <tr><td><code>make_por_departamento(df)</code></td><td>departamento</td><td>total_tickets, fechados, em_processo, pct_fechado, n_transferencias_total</td></tr>
+      <tr><td><code>load_departamentos(path)</code></td><td>—</td><td>Lê Departamentos.xlsx → mapeamento ticket_subject → departamento</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">Abas geradas no XLSX</h3>
+  <table>
+    <thead><tr><th>Aba</th><th>Conteúdo</th></tr></thead>
+    <tbody>
+      <tr><td><code>Aba_Geral</code></td><td>Um registro por ticket com todos os indicadores + gráfico Pie de status</td></tr>
+      <tr><td><code>SLA_Em_Processo</code></td><td>Tickets abertos/em processo ordenados por urgência</td></tr>
+      <tr><td><code>SLA_Resposta</code></td><td>Tempo de resposta BO → BP por ticket</td></tr>
+      <tr><td><code>Funil_Mensal</code></td><td>Abertos/fechados/em processo por mês + gráfico barras + linha SLA</td></tr>
+      <tr><td><code>Funil_Semanal</code></td><td>Idem por semana</td></tr>
+      <tr><td><code>Por_Assunto</code></td><td>Top 20 assuntos + gráfico barras horizontais</td></tr>
+      <tr><td><code>Por_Escritorio</code></td><td>Top 20 escritórios + gráfico fechados vs pendentes</td></tr>
+    </tbody>
+  </table>
+
+  <!-- Dashboard -->
+  <h2 class="sec" id="dashboard">Módulo 3 — dashboard_bko.py</h2>
+
+  <h3 class="sub">Cores do sistema</h3>
+  <div class="cards">
+    <div class="card green"><h4>#2CA02C</h4><p>COR_FECHADO — Verde (tickets fechados)</p></div>
+    <div class="card orange"><h4>#FF7F0E</h4><p>COR_PROCESSO — Laranja (em processamento)</p></div>
+    <div class="card blue"><h4>#1F77B4</h4><p>COR_ABERTO — Azul (tickets abertos)</p></div>
+    <div class="card red"><h4>#D62728</h4><p>COR_ALERTA — Vermelho (SLA estourado)</p></div>
+    <div class="card navy"><h4>#1F3864</h4><p>COR_PRINCIPAL — Azul escuro (cabeçalhos)</p></div>
+  </div>
+
+  <h3 class="sub">Resultado do pipeline (result dict)</h3>
+  <pre>result = {
+    "enc":      str,        # encoding detectado
+    "avisos":   list[str],  # avisos de qualidade dos dados
+    "geral":    DataFrame,  # todos os tickets consolidados
+    "sla_p":    DataFrame,  # SLA Em Processo
+    "sla_r":    DataFrame,  # SLA Resposta
+    "funil_m":  DataFrame,  # Funil Mensal
+    "funil_s":  DataFrame,  # Funil Semanal
+    "assunto":  DataFrame,  # Por Assunto
+    "escrit":   DataFrame,  # Por Escritório
+    "depto":    DataFrame,  # Por Departamento
+    "xlsx":     bytes,      # XLSX completo em memória
+    "ref_time": str,        # "DD/MM/YYYY HH:MM"
+}</pre>
+
+  <h3 class="sub">Cache st.session_state</h3>
+  <pre>f"result_{file.file_id}"  →  result dict (calculado uma vez por arquivo)
+f"pdf_{file.file_id}"     →  bytes do PDF gerado
+f"html_{file.file_id}"    →  bytes do HTML export (UTF-8)</pre>
+
+  <h3 class="sub">Abas do dashboard</h3>
+  <table>
+    <thead><tr><th>Tab</th><th>Função</th><th>Conteúdo</th></tr></thead>
+    <tbody>
+      <tr><td>📋 Aba Geral</td><td><code>tab_aba_geral(df)</code></td><td>Tabela completa com todos os tickets e indicadores</td></tr>
+      <tr><td>⏱ SLA Em Processo</td><td><code>tab_sla_processo(df)</code></td><td>3 cards vermelhos + top-20 tickets em espera (barras coloridas por faixa)</td></tr>
+      <tr><td>📨 SLA Resposta</td><td><code>tab_sla_resposta(df)</code></td><td>4 cards KPI + faixas ≤10h / 10-24h / &gt;24h + tabela</td></tr>
+      <tr><td>📊 Funil</td><td><code>tab_funil(df_m, df_s)</code></td><td>Barras agrupadas mensal e semanal</td></tr>
+      <tr><td>🏷 Por Assunto</td><td><code>tab_por_assunto(df)</code></td><td>Top-25 horizontal + tabela completa</td></tr>
+      <tr><td>🏢 Por Escritório</td><td><code>tab_por_escritorio(df)</code></td><td>Comparativos fechados vs pendentes + tabela</td></tr>
+      <tr><td>🏬 Por Departamento</td><td><code>tab_por_departamento(df)</code></td><td>Volume + SLA + "Transferências: dados em tratamento"</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">Funções de Export</h3>
+  <table>
+    <thead><tr><th>Função</th><th>Assinatura</th><th>O que faz</th></tr></thead>
+    <tbody>
+      <tr><td><code>_build_html_export</code></td><td><code>(result) → str</code></td><td>HTML completo, tema escuro Streamlit, gráficos Plotly interativos via CDN, CSS @media print</td></tr>
+      <tr><td><code>_build_pdf</code></td><td><code>(result) → bytes</code></td><td>PDF via WeasyPrint (Linux/Cloud) com KPIs, tabelas e gráficos PNG base64</td></tr>
+      <tr><td><code>_html_to_pdf</code></td><td><code>(html) → bytes</code></td><td>Tenta WeasyPrint → fallback xhtml2pdf → RuntimeError</td></tr>
+      <tr><td><code>_fig_to_b64</code></td><td><code>(fig) → str</code></td><td>Exporta Plotly figure → PNG base64 via kaleido</td></tr>
+      <tr><td><code>_enviar_email</code></td><td><code>(dest, xlsx, ref, html=None)</code></td><td>Envia SMTP com XLSX + HTML como anexos</td></tr>
+    </tbody>
+  </table>
+
+  <!-- Departamentos -->
+  <h2 class="sec" id="departamentos">Departamentos.xlsx</h2>
+  <div class="info">
+    Arquivo de referência versionado no git (exceção no .gitignore via <code>!Departamentos.xlsx</code>).
+    Funciona como banco de dados de mapeamento de categorias para departamentos.
+  </div>
+  <table>
+    <thead><tr><th>Coluna</th><th>Tipo</th><th>Descrição</th></tr></thead>
+    <tbody>
+      <tr><td><code>ticket_subject</code></td><td>string</td><td>Nome exato da categoria do ticket (JOIN key)</td></tr>
+      <tr><td><code>Departamento</code></td><td>string</td><td>Departamento responsável</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Departamentos existentes:</strong>
+    <span class="pill pill-blue">CS/CX</span>
+    <span class="pill pill-orange">Operações</span>
+    <span class="pill pill-green">Financeiro</span>
+    <span class="pill pill-blue">Capital</span>
+    <span class="pill pill-green">Treinamento &amp; Desenvolvimento</span>
+    <span class="pill pill-red">Sem Departamento</span> (fallback automático)
+  </p>
+
+  <!-- Email -->
+  <h2 class="sec" id="email">Configuração de E-mail</h2>
+  <pre># .streamlit/secrets.toml
+[email]
+smtp_host     = "smtp.gmail.com"
+smtp_port     = 587
+smtp_user     = "seu@email.com"
+smtp_password = "senha_de_app_gmail"
+smtp_from     = "seu@email.com"</pre>
+  <div class="warn">
+    Nunca versionar <code>secrets.toml</code>. Está no .gitignore.<br>
+    Para desenvolvimento local, usar <code>.env</code> com as variáveis <code>EMAIL_SMTP_*</code>.
+  </div>
+
+  <!-- Dependências -->
+  <h2 class="sec" id="deps">Dependências</h2>
+  <h3 class="sub">requirements.txt</h3>
+  <pre>streamlit>=1.35.0
+plotly>=5.18.0
+pandas>=2.0.0
+openpyxl>=3.1.0
+fpdf2>=2.7.0
+kaleido              # export PNG dos gráficos para PDF
+weasyprint>=60.0     # HTML → PDF (Linux/Cloud)
+python-dotenv>=1.0.0</pre>
+
+  <h3 class="sub">packages.txt (Streamlit Cloud — Debian Trixie)</h3>
+  <pre>libpango-1.0-0
+libharfbuzz0b
+libpangoft2-1.0-0
+libpangocairo-1.0-0
+libcairo2
+libgdk-pixbuf-2.0-0
+shared-mime-info
+fonts-liberation</pre>
+
+  <!-- Como rodar -->
+  <h2 class="sec" id="run">Como Rodar Localmente</h2>
+  <pre># 1. Criar ambiente virtual
+python -m venv bko_env
+bko_env\Scripts\activate        # Windows
+source bko_env/bin/activate     # Linux/Mac
+
+# 2. Instalar dependências
+pip install -r requirements.txt
+
+# 3. Configurar e-mail (opcional)
+cp .env.example .env
+# editar .env com credenciais SMTP
+
+# 4. Rodar
+streamlit run dashboard_bko.py
+
+# ou no Windows
+rodar_dashboard.bat</pre>
+
+  <!-- React -->
+  <h2 class="sec" id="react">Replicar em React</h2>
+
+  <h3 class="sub">Backend — Endpoints necessários</h3>
+  <table>
+    <thead><tr><th>Endpoint</th><th>Método</th><th>Equivale a</th></tr></thead>
+    <tbody>
+      <tr><td><code>/upload</code></td><td>POST multipart</td><td><code>process_file()</code> + <code>executar_pipeline()</code></td></tr>
+      <tr><td><code>/result/:id</code></td><td>GET</td><td>Retorna <code>result</code> como JSON</td></tr>
+      <tr><td><code>/export/xlsx/:id</code></td><td>GET</td><td>Retorna bytes do XLSX</td></tr>
+      <tr><td><code>/export/html/:id</code></td><td>GET</td><td>Retorna HTML gerado</td></tr>
+      <tr><td><code>/email</code></td><td>POST</td><td><code>_enviar_email()</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">Frontend — Componentes React</h3>
+  <table>
+    <thead><tr><th>Componente React</th><th>Equivale a</th></tr></thead>
+    <tbody>
+      <tr><td><code>&lt;FileUpload&gt;</code></td><td><code>st.file_uploader</code> + <code>executar_pipeline</code></td></tr>
+      <tr><td><code>&lt;BigNumbers&gt;</code></td><td><code>big_numbers(df)</code> — 5 cards KPI</td></tr>
+      <tr><td><code>&lt;TabGeral&gt;</code></td><td><code>tab_aba_geral</code></td></tr>
+      <tr><td><code>&lt;TabSLAProcesso&gt;</code></td><td><code>tab_sla_processo</code></td></tr>
+      <tr><td><code>&lt;TabSLAResposta&gt;</code></td><td><code>tab_sla_resposta</code></td></tr>
+      <tr><td><code>&lt;TabFunil&gt;</code></td><td><code>tab_funil</code></td></tr>
+      <tr><td><code>&lt;TabPorAssunto&gt;</code></td><td><code>tab_por_assunto</code></td></tr>
+      <tr><td><code>&lt;TabPorEscritorio&gt;</code></td><td><code>tab_por_escritorio</code></td></tr>
+      <tr><td><code>&lt;TabPorDepartamento&gt;</code></td><td><code>tab_por_departamento</code></td></tr>
+      <tr><td><code>&lt;ExportHTML&gt;</code></td><td><code>_build_html_export</code></td></tr>
+      <tr><td><code>&lt;SendEmail&gt;</code></td><td><code>_enviar_email</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="sub">Bibliotecas React sugeridas</h3>
+  <pre>recharts ou plotly.js     # gráficos (mesmos dados do Plotly Python)
+@tanstack/react-table     # tabelas com sort/filter
+react-dropzone            # upload de arquivos
+axios                     # chamadas à API
+dayjs                     # manipulação de datas
+tailwindcss               # estilização</pre>
+
+  <div class="info" style="margin-top:24px">
+    <strong>Dica:</strong> Os gráficos Plotly gerados no Python podem ser servidos como JSON
+    (<code>fig.to_json()</code>) e renderizados no React com <code>react-plotly.js</code>
+    sem precisar reescrever a lógica de visualização.
+  </div>
+
+  <br/><br/>
+  <p style="color:var(--muted);font-size:0.8rem;border-top:1px solid var(--border);padding-top:16px">
+    Projeto: igorgui1337/bko_relatorio · Branch: master · Gerado automaticamente
+  </p>
+
+</main>
+</body>
+</html>
