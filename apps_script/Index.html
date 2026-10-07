@@ -1,0 +1,1037 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<base target="_top">
+<meta charset="utf-8"/>
+<title>Tickets · BackOffice</title>
+<style>
+  /* ═════════════════════ DESIGN TOKENS (paleta W1) ═════════════════════ */
+  :root, :root[data-theme="light"]{
+    --bg:#f4f7f6; --surface:#ffffff; --surface-2:#eef3f2; --surface-3:#e4ecea;
+    --ink:#0c2b2b; --muted:#5a6b6a; --border:#dbe4e3;
+    --brand:#0b494b; --brand-2:#0f6d70; --brand-3:#13908f; --brand-4:#2bb3b0;
+    --accent:#e8a33d; --accent-soft:rgba(232,163,61,.14); --accent-ink:#5c3d0c;
+    --on-brand:#ffffff;
+    --ok:#0b7a5b; --warn:#8f5e13; --danger:#c0442e; --info:#0f6d70;
+    --c1:#0b494b; --c2:#13908f; --c3:#2bb3b0; --c4:#e8a33d; --c5:#0f6d70; --c6:#6a8a89;
+    --st-open:#c0442e; --st-process:#e8a33d; --st-pending:#0f6d70; --st-closed:#0b7a5b;
+    --shadow-sm:0 1px 2px rgba(11,73,75,.05);
+    --font:'Segoe UI',-apple-system,Roboto,Helvetica,Arial,sans-serif;
+  }
+  :root[data-theme="dark"]{
+    --bg:#071615; --surface:#0e211f; --surface-2:#122a28; --surface-3:#173330;
+    --ink:#e7efee; --muted:#9bb0ae; --border:#1d3a37;
+    --brand:#2bb3b0; --brand-2:#38c0bd; --brand-3:#17a3a1; --brand-4:#5fd0cd;
+    --accent:#f0b45a; --accent-soft:rgba(240,180,90,.14); --accent-ink:#1c1403;
+    --on-brand:#04211f;
+    --ok:#3fc79a; --warn:#e0a94a; --danger:#e8735b; --info:#38c0bd;
+    --c1:#2bb3b0; --c2:#17a3a1; --c3:#5fd0cd; --c4:#f0b45a; --c5:#38c0bd; --c6:#7ea3a1;
+    --st-open:#e8735b; --st-process:#f0b45a; --st-pending:#38c0bd; --st-closed:#3fc79a;
+    --shadow-sm:0 1px 2px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13.5px/1.5 var(--font);min-height:100vh}
+  .app{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:100vh}
+  @media (max-width:900px){ .app{grid-template-columns:1fr} }
+
+  /* ─── Sidebar (filtros) ─── */
+  .side{background:var(--surface);border-right:1px solid var(--border);padding:18px 16px 24px;
+    position:sticky;top:0;height:100vh;overflow-y:auto}
+  @media (max-width:900px){ .side{position:static;height:auto;border-right:0;border-bottom:1px solid var(--border)} }
+  .brand{display:flex;align-items:center;gap:9px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+  .brand-dot{width:32px;height:32px;border-radius:8px;background:var(--brand);
+    display:flex;align-items:center;justify-content:center;color:var(--on-brand);font-weight:900;font-size:13px}
+  .brand-name{font-weight:800;font-size:14px;color:var(--brand);letter-spacing:.02em}
+  .brand-sub{font-size:10.5px;color:var(--muted);margin-top:1px}
+
+  .slicer{margin-bottom:16px}
+  .slicer h4{margin:0 0 6px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  .pills{display:flex;flex-wrap:wrap;gap:5px}
+  .pill{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;font-size:11.5px;font-weight:600;
+    border-radius:999px;border:1px solid var(--border);background:transparent;color:var(--muted);
+    cursor:pointer;user-select:none;transition:.15s;font-family:var(--font)}
+  .pill:hover{border-color:var(--brand-3);color:var(--ink)}
+  .pill.on{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}
+  .pill .dot{width:7px;height:7px;border-radius:50%}
+  select, input[type="date"], input[type="search"]{width:100%;padding:6px 8px;font-size:12px;font-family:var(--font);
+    background:var(--surface);color:var(--ink);border:1px solid var(--border);border-radius:6px}
+  select:focus, input:focus{outline:2px solid var(--brand-3);outline-offset:1px}
+  .btn{padding:7px 12px;font-size:11.5px;font-weight:700;border-radius:7px;border:0;cursor:pointer;font-family:var(--font)}
+  .btn-primary{background:var(--brand);color:var(--on-brand)}
+  .btn-primary:hover{background:var(--brand-2)}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+  .btn-ghost:hover{color:var(--ink);border-color:var(--brand-3)}
+  .theme-toggle{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+  .theme-toggle button{padding:4px 8px;background:transparent;border:0;color:var(--muted);cursor:pointer;font-size:12px}
+  .theme-toggle button.on{background:var(--brand);color:var(--on-brand)}
+  .updated{font-size:10.5px;color:var(--muted);margin-top:14px}
+
+  /* ─── Área principal ─── */
+  main{padding:18px 22px 36px;min-width:0}
+  @media (max-width:600px){ main{padding:14px 16px 28px} }
+  .head{display:flex;align-items:center;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+  .head h1{margin:0;font-size:20px;color:var(--brand);font-weight:800}
+  .head .period{color:var(--muted);font-size:12px;margin-top:2px}
+  .head-actions{display:flex;gap:8px;margin-left:auto;align-items:center;flex-wrap:wrap}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:14px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:14px 16px;
+    box-shadow:var(--shadow-sm);position:relative;overflow:hidden}
+  .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--brand-3)}
+  .kpi.k-acc::before{background:var(--accent)}
+  .kpi.k-ok::before{background:var(--ok)}
+  .kpi.k-warn::before{background:var(--st-process)}
+  .kpi.k-bad::before{background:var(--danger)}
+  .kpi-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+  .kpi-value{font-size:26px;font-weight:800;color:var(--brand);margin-top:4px;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+  .kpi.k-bad .kpi-value{color:var(--danger)}
+  .kpi-sub{font-size:11px;color:var(--muted);margin-top:2px}
+
+  .grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:12px;margin-bottom:12px}
+  .grid.half{grid-template-columns:repeat(2,minmax(0,1fr))}
+  @media (max-width:1100px){ .grid, .grid.half{grid-template-columns:minmax(0,1fr)} }
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:14px 16px 16px;box-shadow:var(--shadow-sm);min-width:0}
+  .card h3{margin:0 0 4px;font-size:12.5px;font-weight:700;color:var(--ink);text-transform:uppercase;letter-spacing:.05em}
+  .card .card-sub{font-size:11px;color:var(--muted);margin-bottom:10px}
+  .card.wide{grid-column:1/-1}
+  .card-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .card-head h3{margin-bottom:4px}
+  select.limite{width:auto;padding:3px 6px;font-size:11px;color:var(--muted)}
+
+  svg{display:block;max-width:100%}
+  .chart-caption{font-size:11px;color:var(--muted);margin-top:4px}
+  .axis{fill:var(--muted);font-size:10px;font-family:var(--font)}
+  .gridline{stroke:var(--border);stroke-width:1}
+
+  .tbl-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums;white-space:nowrap}
+  th:first-child, td:first-child{text-align:left}
+  td.txt, th.txt{text-align:left;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+  thead th{color:var(--muted);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;background:var(--surface-2)}
+  tbody tr:hover{background:color-mix(in srgb, var(--brand-3) 6%, transparent)}
+  tbody tr.click{cursor:pointer}
+  tbody tr.sel{background:color-mix(in srgb, var(--brand-3) 14%, transparent)}
+  .avatar{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
+    border-radius:50%;color:#fff;font-size:10px;font-weight:800;margin-right:7px;vertical-align:middle}
+  .bar-cell{position:relative;padding-right:10px}
+  .bar-cell .bg{position:absolute;left:0;top:6px;bottom:6px;background:color-mix(in srgb, var(--brand-3) 20%, transparent);border-radius:3px}
+  .bar-cell span{position:relative}
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700}
+  .badge .dot{width:8px;height:8px;border-radius:50%}
+  .alert-txt{color:var(--danger);font-weight:700}
+
+  .status-legend{display:flex;flex-direction:column;gap:6px;font-size:12px}
+  .status-legend .li{display:flex;align-items:center;gap:8px;padding:4px 6px;border-radius:6px;cursor:pointer}
+  .status-legend .li:hover{background:var(--surface-2)}
+  .status-legend .li.off{opacity:.4}
+  .status-legend .sw{width:12px;height:12px;border-radius:3px}
+  .status-legend .val{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums}
+
+  .hbar-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;align-items:center;
+    cursor:pointer;padding:6px 4px;border-radius:6px;font-size:12px}
+  .hbar-row:hover{background:var(--surface-2)}
+  .hbar-row.static{cursor:default}
+  .hbar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hbar-label small{color:var(--muted);margin-left:6px}
+  .hbar-count{font-size:11.5px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
+  .hbar-track{position:relative;height:16px;background:var(--surface-2);border-radius:3px;overflow:hidden;grid-column:1/-1}
+  .hbar-fill{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--brand-3),var(--brand-4));border-radius:3px}
+  .hbar-fill.bad{background:linear-gradient(90deg,var(--danger),color-mix(in srgb,var(--danger) 70%,white))}
+  .hbar-fill.acc{background:linear-gradient(90deg,var(--accent),color-mix(in srgb,var(--accent) 75%,white))}
+  .hbar-row.sel .hbar-fill{background:linear-gradient(90deg,var(--brand),var(--brand-3))}
+
+  .empty{text-align:center;padding:22px;color:var(--muted);font-size:12px;font-style:italic}
+  .info-box{background:var(--accent-soft);border-left:3px solid var(--accent);border-radius:6px;
+    padding:9px 12px;margin:0 0 12px;font-size:12px;line-height:1.55;color:var(--ink)}
+  .info-box b{font-weight:700}
+  .info-box ul{margin:4px 0 0;padding-left:18px}
+  .info-box .sw{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:3px}
+  .filter-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;font-size:11px;
+    background:var(--brand);color:var(--on-brand);border-radius:999px;margin-right:5px;margin-bottom:4px}
+  .filter-chip .x{cursor:pointer;font-weight:800;opacity:.85}
+  #activeFilters{margin-bottom:10px;min-height:22px}
+
+  .tabs{display:inline-flex;background:var(--surface-2);border-radius:9px;padding:3px;gap:2px;flex-wrap:wrap}
+  .tabs button{background:transparent;border:0;padding:6px 14px;font-size:12.5px;font-weight:700;
+    color:var(--muted);cursor:pointer;border-radius:6px;font-family:var(--font)}
+  .tabs button.on{background:var(--surface);color:var(--brand);box-shadow:var(--shadow-sm)}
+  .tabs button:hover:not(.on){color:var(--ink)}
+  .view{display:none} .view.on{display:block}
+
+  .legend{display:flex;gap:12px;font-size:11px;color:var(--muted);margin-bottom:8px;flex-wrap:wrap}
+  .legend .lg{display:inline-flex;align-items:center;gap:5px}
+  .legend .sw{width:10px;height:10px;border-radius:2px}
+  .more{display:block;margin:10px auto 0}
+
+  body.dense .kpi{padding:10px 12px}
+  body.dense .kpi-value{font-size:22px}
+  body.dense .card{padding:10px 12px}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ═════════════ SIDEBAR (FILTROS) ═════════════ -->
+  <aside class="side">
+    <div class="brand">
+      <div class="brand-dot">W1</div>
+      <div>
+        <div class="brand-name">Tickets · BackOffice</div>
+        <div class="brand-sub">SLA, funil e volume</div>
+      </div>
+    </div>
+
+    <div class="slicer"><h4>Status do ticket</h4><div class="pills" id="fStatus"></div></div>
+    <div class="slicer"><h4>Departamento</h4><select id="fDept"><option value="">Todos os departamentos</option></select></div>
+    <div class="slicer"><h4>Assunto</h4><select id="fSubj"><option value="">Todos os assuntos</option></select></div>
+    <div class="slicer"><h4>Escritório</h4><select id="fEsc"><option value="">Todos os escritórios</option></select></div>
+    <div class="slicer"><h4>Com quem está</h4><div class="pills" id="fFila"></div></div>
+    <div class="slicer"><h4>Transferência de assunto</h4><div class="pills" id="fTransf"></div></div>
+    <div class="slicer"><h4>Analista (último responsável)</h4><select id="fAn"><option value="">Todos os analistas</option></select></div>
+
+    <div class="slicer">
+      <h4>Abertura entre</h4>
+      <input type="date" id="fFrom"/>
+      <div style="height:6px"></div>
+      <input type="date" id="fTo"/>
+      <div class="pills" style="margin-top:8px" id="presets">
+        <button class="pill" data-preset="q1">T1</button>
+        <button class="pill" data-preset="q2">T2</button>
+        <button class="pill" data-preset="q3">T3</button>
+        <button class="pill" data-preset="q4">T4</button>
+        <button class="pill" data-preset="30d">30 d</button>
+        <button class="pill" data-preset="all">Tudo</button>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" id="btnClear">Limpar filtros</button>
+    <div class="updated" id="updated"></div>
+  </aside>
+
+  <!-- ═════════════ MAIN ═════════════ -->
+  <main>
+    <div class="head">
+      <div>
+        <h1>Dashboard de Tickets</h1>
+        <div class="period" id="periodLabel"></div>
+      </div>
+      <div class="head-actions">
+        <div class="tabs" id="tabs">
+          <button data-tab="geral" class="on">Visão geral</button>
+          <button data-tab="sla">SLA</button>
+          <button data-tab="transf">Transferências</button>
+          <button data-tab="grupos">Escritórios &amp; deptos</button>
+          <button data-tab="tickets">Tickets</button>
+        </div>
+        <div class="tabs" id="granTabs" title="Granularidade dos gráficos">
+          <button data-g="auto" class="on">Auto</button>
+          <button data-g="D">Dia</button>
+          <button data-g="W">Semana</button>
+          <button data-g="M">Mês</button>
+        </div>
+        <button class="btn btn-ghost" id="btnDensity" title="Densidade">◐</button>
+        <div class="theme-toggle" id="themeToggle">
+          <button data-t="light" class="on" title="Tema claro">☀</button>
+          <button data-t="dark" title="Tema escuro">🌙</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="activeFilters"></div>
+    <div id="carregando" class="card empty">Carregando dados…</div>
+    <div id="semDados" class="card empty" style="display:none">
+      Sem dados ainda. No editor do Apps Script, rode <b>atualizarDados</b> uma vez.
+    </div>
+
+    <!-- ═════════════ VISÃO GERAL ═════════════ -->
+    <div class="view on" id="view-geral">
+      <div class="kpis">
+        <div class="kpi"><div class="kpi-label">Total de tickets</div><div class="kpi-value" id="kTotal">–</div><div class="kpi-sub" id="kTotalSub"></div></div>
+        <div class="kpi k-ok"><div class="kpi-label">Fechados</div><div class="kpi-value" id="kFech">–</div><div class="kpi-sub" id="kFechSub"></div></div>
+        <div class="kpi k-warn"><div class="kpi-label">Aguardando BO</div><div class="kpi-value" id="kBO">–</div><div class="kpi-sub">última mensagem do consultor</div></div>
+        <div class="kpi k-acc"><div class="kpi-label">Aguardando consultor</div><div class="kpi-value" id="kCons">–</div><div class="kpi-sub">BO já respondeu</div></div>
+        <div class="kpi k-bad"><div class="kpi-label">SLA alerta</div><div class="kpi-value" id="kAlerta">–</div><div class="kpi-sub" id="kAlertaSub"></div></div>
+      </div>
+
+      <div class="grid">
+        <div class="card wide">
+          <h3>Funil por período</h3>
+          <div class="card-sub">tickets por data de abertura, divididos pelo status atual</div>
+          <div class="legend" id="funilLegend"></div>
+          <div id="funilChart"></div>
+          <div class="chart-caption" id="funilCap"></div>
+        </div>
+        <div class="card">
+          <h3>Departamentos</h3>
+          <div class="card-sub">clique para filtrar</div>
+          <div id="topDept"></div>
+        </div>
+        <div class="card">
+          <h3>Status do ticket</h3>
+          <div class="card-sub">clique para filtrar</div>
+          <div style="display:flex;gap:16px;align-items:center;justify-content:space-around;flex-wrap:wrap">
+            <div id="donut"></div>
+            <div class="status-legend" id="legendStatus" style="flex:1 1 140px"></div>
+          </div>
+        </div>
+        <div class="card wide">
+          <div class="card-head"><h3>Top assuntos</h3><select class="limite" data-k="topSubj" title="Quantos itens mostrar"><option value="10">10 primeiros</option><option value="25">25 primeiros</option><option value="50">50 primeiros</option><option value="0">Todos</option></select></div>
+          <div class="card-sub">volume, % fechado e tempo médio de resposta · clique para filtrar</div>
+          <div id="topSubj"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════════ SLA ═════════════ -->
+    <div class="view" id="view-sla">
+      <div class="kpis">
+        <div class="kpi k-warn"><div class="kpi-label">Aguardando BO</div><div class="kpi-value" id="sEspera">–</div><div class="kpi-sub">última mensagem do consultor</div></div>
+        <div class="kpi k-bad"><div class="kpi-label" id="sAlertaLbl">Acima do SLA</div><div class="kpi-value" id="sAlerta">–</div><div class="kpi-sub" id="sAlertaSub"></div></div>
+        <div class="kpi"><div class="kpi-label">Maior espera</div><div class="kpi-value" id="sMaior">–</div><div class="kpi-sub" id="sMaiorSub"></div></div>
+        <div class="kpi k-acc"><div class="kpi-label">Espera média</div><div class="kpi-value" id="sMedia">–</div><div class="kpi-sub">desde a última mensagem do consultor</div></div>
+        <div class="kpi"><div class="kpi-label">Aguardando consultor</div><div class="kpi-value" id="sCons">–</div><div class="kpi-sub" id="sConsSub"></div></div>
+      </div>
+
+      <div class="grid">
+        <div class="card wide">
+          <div class="card-head"><h3>Tickets aguardando o BO</h3><select class="limite" data-k="topEspera" title="Quantos itens mostrar"><option value="10">10 primeiros</option><option value="25">25 primeiros</option><option value="50">50 primeiros</option><option value="0">Todos</option></select></div>
+          <div class="card-sub">ordenados pelo tempo desde a última mensagem do consultor · vermelho = acima do SLA</div>
+          <div class="info-box">
+            ⓘ <b>O que é esta lista:</b> tickets não fechados em que a <b>última mensagem foi do consultor</b>,
+            ou seja, <b>a vez de responder é do BackOffice</b>.
+            <ul>
+              <li><b>Tempo à direita:</b> há quanto tempo o BO está devendo resposta, contado desde a última mensagem do consultor (e não desde a abertura).</li>
+              <li><span class="sw" style="background:var(--danger)"></span><b>Vermelho:</b> esperando há mais de <span class="sla-h">24</span>h (fora do SLA) ·
+                  <span class="sw" style="background:var(--accent)"></span><b>Laranja:</b> dentro do SLA.</li>
+              <li><b>Fica de fora:</b> tickets em que o BO já respondeu e aguarda o consultor. Esses aparecem em “Aguardando consultor” e não contam no SLA.</li>
+            </ul>
+          </div>
+          <div id="topEspera"></div>
+        </div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi"><div class="kpi-label">Respondidos</div><div class="kpi-value" id="rTotal">–</div><div class="kpi-sub">com 1ª resposta registrada</div></div>
+        <div class="kpi k-acc"><div class="kpi-label">Tempo médio de resposta</div><div class="kpi-value" id="rMedia">–</div><div class="kpi-sub">abertura → 1ª resposta</div></div>
+        <div class="kpi"><div class="kpi-label">Mediana</div><div class="kpi-value" id="rMediana">–</div><div class="kpi-sub">metade responde em até</div></div>
+        <div class="kpi k-ok"><div class="kpi-label">Respondidos em até 10h</div><div class="kpi-value" id="rPct">–</div><div class="kpi-sub" id="rPctSub"></div></div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h3>Tempo médio de resposta por período</h3>
+          <div class="card-sub">horas entre abertura e 1ª resposta, pela data de abertura</div>
+          <div id="respChart"></div>
+        </div>
+        <div class="card">
+          <h3>Faixas de tempo de resposta</h3>
+          <div class="card-sub">distribuição dos tickets respondidos</div>
+          <div id="faixas"></div>
+        </div>
+        <div class="card wide">
+          <div class="card-head"><h3>Respostas mais lentas</h3><select class="limite" data-k="tblLentas" title="Quantos itens mostrar"><option value="10">10 primeiros</option><option value="25">25 primeiros</option><option value="50">50 primeiros</option><option value="100">100 primeiros</option><option value="500">500 primeiros</option></select></div>
+          <div class="card-sub">tickets com maior tempo até a 1ª resposta</div>
+          <div class="tbl-wrap"><table id="tblLentas"></table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════════ TRANSFERÊNCIAS ═════════════ -->
+    <div class="view" id="view-transf">
+      <div class="kpis">
+        <div class="kpi"><div class="kpi-label">Tickets transferidos</div><div class="kpi-value" id="tTotal">–</div><div class="kpi-sub" id="tTotalSub"></div></div>
+        <div class="kpi k-acc"><div class="kpi-label">Para outra área</div><div class="kpi-value" id="tOutra">–</div><div class="kpi-sub" id="tOutraSub"></div></div>
+        <div class="kpi k-ok"><div class="kpi-label">Na mesma área</div><div class="kpi-value" id="tMesma">–</div><div class="kpi-sub" id="tMesmaSub"></div></div>
+        <div class="kpi k-warn"><div class="kpi-label">Tempo até transferir</div><div class="kpi-value" id="tTempo">–</div><div class="kpi-sub" id="tTempoSub"></div></div>
+      </div>
+
+      <div class="grid">
+        <div class="card wide">
+          <h3>Transferências por período</h3>
+          <div class="card-sub">pela data da última transferência de cada ticket</div>
+          <div class="legend" id="transfLegend"></div>
+          <div id="transfChart"></div>
+        </div>
+      </div>
+      <div class="grid half">
+        <div class="card">
+          <h3>Áreas que mais transferem</h3>
+          <div class="card-sub">área de origem da transferência</div>
+          <div id="transfOrigem"></div>
+        </div>
+        <div class="card">
+          <h3>Áreas que mais recebem</h3>
+          <div class="card-sub">área de destino da transferência</div>
+          <div id="transfDestino"></div>
+        </div>
+        <div class="card wide">
+          <div class="card-head"><h3>Principais fluxos</h3><select class="limite" data-k="transfFluxos" title="Quantos itens mostrar"><option value="10">10 primeiros</option><option value="25">25 primeiros</option><option value="50">50 primeiros</option><option value="0">Todos</option></select></div>
+          <div class="card-sub">assunto de origem → assunto de destino</div>
+          <div id="transfFluxos"></div>
+        </div>
+        <div class="card wide">
+          <h3>Transferências mais recentes</h3>
+          <div class="card-sub">30 últimas no recorte · conta só a última transferência de cada ticket</div>
+          <div class="tbl-wrap"><table id="tblTransf"></table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════════ ESCRITÓRIOS & DEPARTAMENTOS ═════════════ -->
+    <div class="view" id="view-grupos">
+      <div class="grid">
+        <div class="card wide">
+          <h3>Por departamento</h3>
+          <div class="card-sub">clique numa linha para filtrar</div>
+          <div class="tbl-wrap"><table id="tblDept"></table></div>
+        </div>
+        <div class="card wide">
+          <div class="card-head"><h3>Por escritório</h3><select class="limite" data-k="tblEsc" title="Quantos itens mostrar"><option value="10">10 primeiros</option><option value="25">25 primeiros</option><option value="50">50 primeiros</option><option value="0">Todos</option></select></div>
+          <div class="card-sub">clique numa linha para filtrar</div>
+          <div class="tbl-wrap"><table id="tblEsc"></table></div>
+        </div>
+        <div class="card wide">
+          <div class="card-head"><h3>Por analista</h3><select class="limite" data-k="tblAn" title="Quantos itens mostrar"><option value="10">10 primeiros</option><option value="25">25 primeiros</option><option value="50">50 primeiros</option><option value="0">Todos</option></select></div>
+          <div class="card-sub">último responsável BO do ticket · clique numa linha para filtrar</div>
+          <div class="tbl-wrap"><table id="tblAn"></table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═════════════ TICKETS ═════════════ -->
+    <div class="view" id="view-tickets">
+      <div class="card">
+        <div class="card-head"><h3>Todos os tickets</h3><select class="limite" data-k="tblTickets" title="Quantos itens mostrar"><option value="10">10 primeiros</option><option value="25">25 primeiros</option><option value="50">50 primeiros</option><option value="100">100 primeiros</option><option value="500">500 primeiros</option></select></div>
+        <div class="card-sub" id="ticketsSub"></div>
+        <input type="search" id="busca" placeholder="Buscar por ticket, assunto, analista, consultor ou escritório…" style="margin-bottom:10px"/>
+        <div class="tbl-wrap"><table id="tblTickets"></table></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ═════════════════════════════════════════════════════════════════════════════
+// Dados gerados pelo Code.gs (atualizarDados), carregados por getDados() depois
+// que a página abre. Formato da linha de ticket: ver codificar_() no Code.gs.
+// ═════════════════════════════════════════════════════════════════════════════
+let D = null;
+
+const I = {TID:0, SUBJ:1, ST:2, AB:3, RESP:4, ULT:5, TPROC:6, TRESP:7, NMSG:8, NTROCAS:9, AN:10, CONS:11, ESC:12,
+           FILA:13, TR_DT:14, TR_DE:15, TR_PARA:16, TR_AREA_DE:17, TR_AREA_PARA:18, TR_TIPO:19};
+// Com quem está o ticket não fechado (Code.gs: FILA), pela última mensagem
+const VERSAO_DADOS = 2;   // igual ao Code.gs
+const FILA_BO = 1, FILA_CONS = 2;
+const FILA_LABEL = {[FILA_BO]:'Aguardando BO', [FILA_CONS]:'Aguardando consultor'};
+const FILA_COR = {[FILA_BO]:'var(--danger)', [FILA_CONS]:'var(--st-pending)'};
+const SEM_TRANSF = 'Sem transferência';
+const TIPO_COR = {'Outra área':'var(--accent)', 'Mesma área':'var(--brand-3)', [SEM_TRANSF]:'var(--c6)'};
+const ST_LABEL = {open:'Aberto', processing:'Em processo', pending:'Pendente', closed:'Fechado'};
+const ST_COR   = {open:'var(--st-open)', processing:'var(--st-process)', pending:'var(--st-pending)', closed:'var(--st-closed)'};
+const PALETA   = ['var(--c1)','var(--c2)','var(--c3)','var(--c4)','var(--c5)','var(--c6)'];
+const SEM_DEPTO = 'Sem Departamento';
+const MES_PT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString('pt-BR');
+const pct = (a, b) => b ? (a / b * 100).toFixed(1).replace('.', ',') + '%' : '–';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const media = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+function mediana(arr){
+  if (!arr.length) return null;
+  const s = arr.slice().sort((a, b) => a - b), m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+/** 459.2 -> "19d 3h" · 5.25 -> "5h 15min" · 0.4 -> "24min" (mesma ideia do _fmt_h do Streamlit) */
+function fmtH(h){
+  if (h == null || isNaN(h)) return '–';
+  if (h < 1) return Math.round(h * 60) + 'min';
+  if (h < 24){ const m = Math.round((h % 1) * 60); return Math.floor(h) + 'h' + (m ? ' ' + m + 'min' : ''); }
+  const hr = Math.round(h); return Math.floor(hr / 24) + 'd ' + (hr % 24) + 'h';
+}
+const fmtData = s => s ? `${s.slice(8,10)}/${s.slice(5,7)}/${s.slice(0,4)} ${s.slice(11)}` : '–';
+const statusKey = t => D.statusOrdem[t[I.ST]] || '';
+const deptOf = t => t[I.SUBJ] >= 0 ? D.departamentos[D.deptPorAssunto[t[I.SUBJ]]] : SEM_DEPTO;
+const aguardandoBO = t => t[I.FILA] === FILA_BO;
+const aguardandoCons = t => t[I.FILA] === FILA_CONS;
+/** Horas desde a última mensagem até a atualização dos dados. */
+const esperaH = t => t[I.ULT] ? horasEntre(t[I.ULT], D.geradoEm) : (t[I.TPROC] || 0);
+/** SLA só conta quando a vez é do BO, a partir da última mensagem do consultor. */
+const alerta = t => aguardandoBO(t) && esperaH(t) > D.slaH;
+const transferido = t => t.length > I.TR_DT;
+const tipoTransf = t => transferido(t) ? (D.tiposTransf[t[I.TR_TIPO]] || 'Transferido') : SEM_TRANSF;
+/** Horas entre duas datas "yyyy-MM-dd HH:mm" (mesmo fuso). */
+const horasEntre = (a, b) => (Date.parse(b.replace(' ', 'T') + ':00Z') - Date.parse(a.replace(' ', 'T') + ':00Z')) / 3600000;
+function corDe(nome){ let h = 0; for (const c of nome) h = (h * 31 + c.charCodeAt(0)) >>> 0; return PALETA[h % PALETA.length]; }
+function iniciais(nome){ const p = nome.trim().split(/\s+/); return ((p[0]||'')[0] + ((p[1]||'')[0] || '')).toUpperCase(); }
+
+function diasEntre(from, to){
+  const out = []; let d = new Date(from + 'T00:00:00Z'); const fim = new Date(to + 'T00:00:00Z');
+  while (d <= fim){ out.push(d.toISOString().slice(0, 10)); d.setUTCDate(d.getUTCDate() + 1); }
+  return out;
+}
+function isoMonday(iso){
+  const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - (d.getUTCDay() + 6) % 7);
+  return d.toISOString().slice(0, 10);
+}
+function bucketKey(iso, g){ return g === 'D' ? iso : g === 'W' ? isoMonday(iso) : iso.slice(0, 7); }
+function bucketLabel(k, g){
+  if (g === 'D') return k.slice(8) + '/' + k.slice(5, 7);
+  if (g === 'W') return 'sem ' + k.slice(8) + '/' + k.slice(5, 7);
+  return MES_PT[+k.slice(5, 7) - 1] + '/' + k.slice(2, 4);
+}
+
+// ── Estado (filtros) ───────────────────────────────────────────────────────
+let MIN_DIA = '', MAX_DIA = '';
+const state = { status: new Set(), fila: new Set(), transf: new Set(), dept: '', subj: '', esc: '', an: '', from: '', to: '', gran: 'auto', busca: '' };
+let activeTab = 'geral';
+const limites = { topSubj: 10, topEspera: 10, transfFluxos: 10, tblEsc: 10, tblAn: 10, tblTickets: 10, tblLentas: 10 };
+/** Primeiros N da lista conforme o seletor do quadro; atualiza o "Todos (N)" do seletor. */
+function limitar(k, lista){
+  const sel = document.querySelector(`select.limite[data-k="${k}"]`);
+  const todos = sel && sel.querySelector('option[value="0"]');
+  if (todos) todos.textContent = `Todos (${fmt(lista.length)})`;
+  return limites[k] ? lista.slice(0, limites[k]) : lista;
+}
+
+function granEfetiva(){
+  if (state.gran !== 'auto') return state.gran;
+  const n = diasEntre(state.from, state.to).length;
+  return n <= 45 ? 'D' : n <= 120 ? 'W' : 'M';
+}
+function listaBuckets(g){
+  const out = [], seen = new Set();
+  for (const d of diasEntre(state.from, state.to)){ const k = bucketKey(d, g); if (!seen.has(k)){ seen.add(k); out.push(k); } }
+  return out;
+}
+
+function filtrados(){
+  const out = [];
+  for (const t of D.t){
+    const dia = t[I.AB].slice(0, 10);
+    if (dia && (dia < state.from || dia > state.to)) continue;
+    if (state.status.size && !state.status.has(statusKey(t))) continue;
+    if (state.dept && deptOf(t) !== state.dept) continue;
+    if (state.subj !== '' && String(t[I.SUBJ]) !== state.subj) continue;
+    if (state.esc !== '' && String(t[I.ESC]) !== state.esc) continue;
+    if (state.an !== '' && String(t[I.AN]) !== state.an) continue;
+    if (state.transf.size && !state.transf.has(tipoTransf(t))) continue;
+    if (state.fila.size && !state.fila.has(t[I.FILA])) continue;
+    out.push(t);
+  }
+  return out;
+}
+
+/** Agregado padrão de um grupo de tickets (mesmas colunas das abas do XLSX). */
+function agregar(lista){
+  const a = { total: lista.length, fechados: 0, processo: 0, abertos: 0, pendentes: 0, alerta: 0, aguardBO: 0, aguardCons: 0, trocas: 0, transferidos: 0, resp: [], proc: [] };
+  for (const t of lista){
+    const s = statusKey(t);
+    if (s === 'closed') a.fechados++;
+    else if (s === 'processing') a.processo++;
+    else if (s === 'open') a.abertos++;
+    else if (s === 'pending') a.pendentes++;
+    if (alerta(t)) a.alerta++;
+    if (aguardandoBO(t)) a.aguardBO++;
+    else if (aguardandoCons(t)) a.aguardCons++;
+    a.trocas += t[I.NTROCAS];
+    if (transferido(t)) a.transferidos++;
+    if (t[I.TRESP] != null) a.resp.push(t[I.TRESP]);
+    if (t[I.TPROC] != null) a.proc.push(t[I.TPROC]);
+  }
+  return a;
+}
+function agruparPor(lista, chaveFn){
+  const m = new Map();
+  for (const t of lista){ const k = chaveFn(t); if (!m.has(k)) m.set(k, []); m.get(k).push(t); }
+  return [...m.entries()].map(([k, l]) => ({ k, l, a: agregar(l) })).sort((x, y) => y.a.total - x.a.total);
+}
+
+// ═══════════════════════════════ Render ════════════════════════════════════
+function render(){
+  const L = filtrados();
+  renderFiltrosAtivos();
+  $('periodLabel').textContent = `Abertura de ${fmtData(state.from).slice(0,10)} a ${fmtData(state.to).slice(0,10)} · ${fmt(L.length)} tickets no recorte`;
+  if (activeTab === 'geral') renderGeral(L);
+  else if (activeTab === 'sla') renderSla(L);
+  else if (activeTab === 'transf') renderTransf(L);
+  else if (activeTab === 'grupos') renderGrupos(L);
+  else renderTickets(L);
+}
+
+// ── Visão geral ────────────────────────────────────────────────────────────
+function renderGeral(L){
+  const a = agregar(L);
+  $('kTotal').textContent = fmt(a.total);
+  $('kTotalSub').textContent = `${diasEntre(state.from, state.to).length} dias no recorte`;
+  $('kFech').textContent = fmt(a.fechados);
+  $('kFechSub').textContent = `${pct(a.fechados, a.total)} do total`;
+  $('kBO').textContent = fmt(a.aguardBO);
+  $('kCons').textContent = fmt(a.aguardCons);
+  $('kAlerta').textContent = fmt(a.alerta);
+  $('kAlertaSub').textContent = `aguardando BO há mais de ${D.slaH}h`;
+
+  // Funil empilhado por status
+  const g = granEfetiva(), buckets = listaBuckets(g);
+  const ordem = D.statusOrdem.filter(s => L.some(t => statusKey(t) === s));
+  const idx = new Map(buckets.map((b, i) => [b, i]));
+  const series = ordem.map(s => ({ label: ST_LABEL[s] || s, cor: ST_COR[s] || 'var(--c6)', values: buckets.map(() => 0), s }));
+  for (const t of L){
+    if (!t[I.AB]) continue;
+    const i = idx.get(bucketKey(t[I.AB].slice(0, 10), g));
+    const si = ordem.indexOf(statusKey(t));
+    if (i != null && si >= 0) series[si].values[i]++;
+  }
+  $('funilLegend').innerHTML = series.map(s => `<span class="lg"><span class="sw" style="background:${s.cor}"></span>${esc(s.label)}</span>`).join('');
+  $('funilChart').innerHTML = barChart(buckets.map(b => bucketLabel(b, g)), series, { stacked: true });
+  const totais = buckets.map((_, i) => series.reduce((acc, s) => acc + s.values[i], 0));
+  const pico = Math.max(0, ...totais);
+  $('funilCap').textContent = buckets.length
+    ? `${fmt(a.total)} tickets · ${pct(a.fechados, a.total)} fechados · pico de ${fmt(pico)} em ${bucketLabel(buckets[totais.indexOf(pico)], g)}`
+    : '';
+
+  // Status (donut)
+  const porSt = ordem.map(s => ({ s, n: L.filter(t => statusKey(t) === s).length }));
+  $('donut').innerHTML = donut(porSt.map(x => ({ v: x.n, cor: ST_COR[x.s] || 'var(--c6)' })), fmt(a.total), 'tickets');
+  $('legendStatus').innerHTML = '';
+  for (const x of porSt){
+    const li = document.createElement('div');
+    li.className = 'li' + (state.status.size && !state.status.has(x.s) ? ' off' : '');
+    li.innerHTML = `<span class="sw" style="background:${ST_COR[x.s] || 'var(--c6)'}"></span>${esc(ST_LABEL[x.s] || x.s)}
+      <span class="val">${fmt(x.n)} <small style="color:var(--muted);font-weight:400">${pct(x.n, a.total)}</small></span>`;
+    li.onclick = () => { toggleSet(state.status, x.s); sincronizarControles(); render(); };
+    $('legendStatus').appendChild(li);
+  }
+
+  // Departamentos
+  const dep = agruparPor(L, deptOf);
+  hbars($('topDept'), dep.map(d => ({
+    label: d.k, valor: d.a.total, extra: `${pct(d.a.fechados, d.a.total)} fechados`,
+    sel: state.dept === d.k, onClick: () => { state.dept = state.dept === d.k ? '' : d.k; sincronizarControles(); render(); },
+  })));
+
+  // Assuntos
+  const subj = limitar('topSubj', agruparPor(L, t => t[I.SUBJ]));
+  hbars($('topSubj'), subj.map(d => ({
+    label: D.assuntos[d.k] || '(sem assunto)', valor: d.a.total,
+    extra: `${pct(d.a.fechados, d.a.total)} fechados · resp. ${fmtH(media(d.a.resp))}`,
+    sel: state.subj === String(d.k),
+    onClick: () => { state.subj = state.subj === String(d.k) ? '' : String(d.k); sincronizarControles(); render(); },
+  })));
+}
+
+// ── SLA ────────────────────────────────────────────────────────────────────
+function renderSla(L){
+  const espera = L.filter(aguardandoBO).sort((x, y) => esperaH(y) - esperaH(x));
+  const comAlerta = espera.filter(alerta).length;
+  const cons = L.filter(aguardandoCons);
+  $('sEspera').textContent = fmt(espera.length);
+  $('sAlertaLbl').textContent = `Acima de ${D.slaH}h`;
+  document.querySelectorAll('.sla-h').forEach(e => e.textContent = D.slaH);
+  $('sAlerta').textContent = fmt(comAlerta);
+  $('sAlertaSub').textContent = `${pct(comAlerta, espera.length)} dos aguardando BO`;
+  $('sMaior').textContent = espera.length ? fmtH(esperaH(espera[0])) : '–';
+  $('sMaiorSub').textContent = espera.length ? `ticket #${espera[0][I.TID]}` : '';
+  $('sMedia').textContent = fmtH(media(espera.map(esperaH)));
+  $('sCons').textContent = fmt(cons.length);
+  $('sConsSub').textContent = `sem SLA · esperando em média ${fmtH(media(cons.map(esperaH)))}`;
+
+  hbars($('topEspera'), limitar('topEspera', espera).map(t => ({
+    label: `#${t[I.TID]} · ${D.assuntos[t[I.SUBJ]] || '(sem assunto)'}`,
+    extra: [D.analistas[t[I.AN]], ST_LABEL[statusKey(t)], `aberto há ${fmtH(t[I.TPROC])}`].filter(Boolean).join(' · '),
+    valor: esperaH(t), texto: fmtH(esperaH(t)), classe: alerta(t) ? 'bad' : 'acc',
+  })), { estatico: true });
+
+  const resp = L.filter(t => t[I.TRESP] != null);
+  const tempos = resp.map(t => t[I.TRESP]);
+  const ate10 = tempos.filter(h => h <= 10).length, ate24 = tempos.filter(h => h > 10 && h <= 24).length;
+  $('rTotal').textContent = fmt(resp.length);
+  $('rMedia').textContent = fmtH(media(tempos));
+  $('rMediana').textContent = fmtH(mediana(tempos));
+  $('rPct').textContent = pct(ate10, tempos.length);
+  $('rPctSub').textContent = `${fmt(ate10)} de ${fmt(tempos.length)}`;
+
+  hbars($('faixas'), [
+    { label: 'Até 10h', valor: ate10, extra: pct(ate10, tempos.length), classe: '' },
+    { label: 'De 10h a 24h', valor: ate24, extra: pct(ate24, tempos.length), classe: 'acc' },
+    { label: 'Acima de 24h', valor: tempos.length - ate10 - ate24, extra: pct(tempos.length - ate10 - ate24, tempos.length), classe: 'bad' },
+  ], { estatico: true });
+
+  const g = granEfetiva(), buckets = listaBuckets(g), idx = new Map(buckets.map((b, i) => [b, i]));
+  const soma = buckets.map(() => []);
+  for (const t of resp){ const i = idx.get(bucketKey(t[I.AB].slice(0, 10), g)); if (i != null) soma[i].push(t[I.TRESP]); }
+  $('respChart').innerHTML = barChart(buckets.map(b => bucketLabel(b, g)),
+    [{ label: 'Tempo médio (h)', cor: 'var(--brand-3)', values: soma.map(a => +(media(a) || 0).toFixed(1)) }],
+    { refLine: D.slaH, fmtV: v => fmtH(v) });
+
+  const lentas = limitar('tblLentas', resp.slice().sort((x, y) => y[I.TRESP] - x[I.TRESP]));
+  tabela($('tblLentas'),
+    ['Ticket', 'Assunto', 'Status', 'Abertura', '1ª resposta', 'Tempo', 'Analista', 'Escritório'],
+    lentas.map(t => ({ cells: [
+      '#' + t[I.TID], { txt: D.assuntos[t[I.SUBJ]] }, { html: badge(statusKey(t)) },
+      fmtData(t[I.AB]), fmtData(t[I.RESP]),
+      { num: true, html: `<span class="${t[I.TRESP] > D.slaH ? 'alert-txt' : ''}">${fmtH(t[I.TRESP])}</span>` },
+      { txt: D.analistas[t[I.AN]] }, { txt: D.escritorios[t[I.ESC]] },
+    ] })));
+}
+
+// ── Transferências ─────────────────────────────────────────────────────────
+// Fonte: colunas last_transference / transfer_* do Metabase (última troca de assunto do ticket).
+function renderTransf(L){
+  const T = L.filter(transferido);
+  const outra = T.filter(t => tipoTransf(t) === 'Outra área').length;
+  const mesma = T.filter(t => tipoTransf(t) === 'Mesma área').length;
+  const tempos = T.filter(t => t[I.AB]).map(t => horasEntre(t[I.AB], t[I.TR_DT])).filter(h => h >= 0);
+  $('tTotal').textContent = fmt(T.length);
+  $('tTotalSub').textContent = `${pct(T.length, L.length)} dos ${fmt(L.length)} tickets`;
+  $('tOutra').textContent = fmt(outra);
+  $('tOutraSub').textContent = `${pct(outra, T.length)} das transferências`;
+  $('tMesma').textContent = fmt(mesma);
+  $('tMesmaSub').textContent = `${pct(mesma, T.length)} das transferências`;
+  $('tTempo').textContent = fmtH(media(tempos));
+  $('tTempoSub').textContent = `média · mediana ${fmtH(mediana(tempos))}`;
+
+  // Por período (data da transferência)
+  const g = granEfetiva(), buckets = listaBuckets(g), idx = new Map(buckets.map((b, i) => [b, i]));
+  const tipos = [...new Set(T.map(tipoTransf))].sort();
+  const series = tipos.map(tp => ({ label: tp, cor: TIPO_COR[tp] || 'var(--c5)', values: buckets.map(() => 0) }));
+  for (const t of T){
+    const i = idx.get(bucketKey(t[I.TR_DT].slice(0, 10), g));
+    if (i != null) series[tipos.indexOf(tipoTransf(t))].values[i]++;
+  }
+  $('transfLegend').innerHTML = series.map(s => `<span class="lg"><span class="sw" style="background:${s.cor}"></span>${esc(s.label)}</span>`).join('');
+  $('transfChart').innerHTML = barChart(buckets.map(b => bucketLabel(b, g)), series, { stacked: true });
+
+  const contar = (fn, n) => {
+    const m = new Map();
+    for (const t of T){ const k = fn(t); m.set(k, (m.get(k) || 0) + 1); }
+    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, n);
+  };
+  const area = i => D.areas[i] || '(sem área)';
+  hbars($('transfOrigem'), contar(t => area(t[I.TR_AREA_DE]), 12).map(([k, n]) => ({ label: k, valor: n, extra: pct(n, T.length) })), { estatico: true });
+  hbars($('transfDestino'), contar(t => area(t[I.TR_AREA_PARA]), 12).map(([k, n]) => ({ label: k, valor: n, extra: pct(n, T.length), classe: 'acc' })), { estatico: true });
+  hbars($('transfFluxos'), limitar('transfFluxos', contar(t => `${D.assuntos[t[I.TR_DE]] || '?'}  →  ${D.assuntos[t[I.TR_PARA]] || '?'}`, Infinity))
+    .map(([k, n]) => ({ label: k, valor: n, extra: pct(n, T.length) })), { estatico: true });
+
+  const recentes = T.slice().sort((x, y) => (y[I.TR_DT] > x[I.TR_DT]) - (y[I.TR_DT] < x[I.TR_DT])).slice(0, 30);
+  tabela($('tblTransf'),
+    ['Ticket', 'De', 'Para', 'Tipo', 'Transferido em', 'Após abertura', 'Status', 'Analista'],
+    recentes.map(t => ({ cells: [
+      '#' + t[I.TID], { txt: D.assuntos[t[I.TR_DE]] }, { txt: D.assuntos[t[I.TR_PARA]] }, { txt: tipoTransf(t) },
+      fmtData(t[I.TR_DT]), t[I.AB] ? fmtH(horasEntre(t[I.AB], t[I.TR_DT])) : '–', { html: badge(statusKey(t)) },
+      { txt: D.analistas[t[I.AN]] },
+    ] })));
+}
+
+// ── Escritórios & departamentos ────────────────────────────────────────────
+function renderGrupos(L){
+  const dep = agruparPor(L, deptOf);
+  const maxD = Math.max(1, ...dep.map(d => d.a.total));
+  tabela($('tblDept'),
+    ['Departamento', 'Tickets', 'Fechados', '% fechado', 'Aguardando BO', 'Aguard. consultor', 'SLA alerta', 'TM resposta', 'TM processo', 'Transferidos', '% transf.', 'Trocas de resp.'],
+    dep.map(d => ({
+      sel: state.dept === d.k,
+      onClick: () => { state.dept = state.dept === d.k ? '' : d.k; sincronizarControles(); render(); },
+      cells: [{ txt: d.k }, barCell(d.a.total, maxD), fmt(d.a.fechados), pct(d.a.fechados, d.a.total),
+        fmt(d.a.aguardBO), fmt(d.a.aguardCons), alertaCell(d.a.alerta), fmtH(media(d.a.resp)), fmtH(media(d.a.proc)),
+        fmt(d.a.transferidos), pct(d.a.transferidos, d.a.total), fmt(d.a.trocas)],
+    })));
+
+  const es = agruparPor(L, t => t[I.ESC]);
+  const maxE = Math.max(1, ...es.map(d => d.a.total));
+  tabela($('tblEsc'),
+    ['Escritório', 'Tickets', 'Fechados', '% fechado', 'Pendentes', '% pendente', 'SLA alerta', 'TM resposta', 'Mín', 'Máx', 'TM processo'],
+    limitar('tblEsc', es).map(d => {
+      const pend = d.a.total - d.a.fechados;
+      return {
+        sel: state.esc === String(d.k),
+        onClick: () => { state.esc = state.esc === String(d.k) ? '' : String(d.k); sincronizarControles(); render(); },
+        cells: [{ txt: D.escritorios[d.k] || '(sem escritório)' }, barCell(d.a.total, maxE),
+          fmt(d.a.fechados), pct(d.a.fechados, d.a.total), fmt(pend), pct(pend, d.a.total), alertaCell(d.a.alerta),
+          fmtH(media(d.a.resp)), fmtH(d.a.resp.length ? Math.min(...d.a.resp) : null),
+          fmtH(d.a.resp.length ? Math.max(...d.a.resp) : null), fmtH(media(d.a.proc))],
+      };
+    }));
+
+  const an = agruparPor(L, t => t[I.AN]);
+  const maxA = Math.max(1, ...an.map(d => d.a.total));
+  tabela($('tblAn'),
+    ['Analista', 'Tickets', 'Fechados', '% fechado', 'Aguardando BO', 'Aguard. consultor', 'SLA alerta', 'TM resposta', 'Transferidos', 'Trocas de resp.'],
+    limitar('tblAn', an).map(d => {
+      const nome = D.analistas[d.k] || '(sem analista)';
+      return {
+        sel: state.an === String(d.k),
+        onClick: () => { state.an = state.an === String(d.k) ? '' : String(d.k); sincronizarControles(); render(); },
+        cells: [{ html: `<span class="avatar" style="background:${corDe(nome)}">${esc(iniciais(nome))}</span>${esc(nome)}` },
+          barCell(d.a.total, maxA), fmt(d.a.fechados), pct(d.a.fechados, d.a.total),
+          fmt(d.a.aguardBO), fmt(d.a.aguardCons), alertaCell(d.a.alerta), fmtH(media(d.a.resp)), fmt(d.a.transferidos), fmt(d.a.trocas)],
+      };
+    }));
+}
+
+// ── Tickets ────────────────────────────────────────────────────────────────
+function renderTickets(L){
+  const q = state.busca.trim().toLowerCase();
+  let lista = L;
+  if (q){
+    lista = L.filter(t => [t[I.TID], D.assuntos[t[I.SUBJ]], D.analistas[t[I.AN]], D.consultores[t[I.CONS]], D.escritorios[t[I.ESC]]]
+      .some(v => v != null && String(v).toLowerCase().includes(q)));
+  }
+  lista = lista.slice().sort((x, y) => (y[I.AB] > x[I.AB]) - (y[I.AB] < x[I.AB]));
+  $('ticketsSub').textContent = `${fmt(lista.length)} tickets · mais recentes primeiro`;
+  tabela($('tblTickets'),
+    ['Ticket', 'Assunto', 'Status', 'Com quem', 'Abertura', 'Tempo em processo', '1ª resposta BO', 'Msgs', 'Trocas de resp.', 'Transferência', 'Analista', 'Consultor', 'Escritório', 'Departamento'],
+    limitar('tblTickets', lista).map(t => ({ cells: [
+      '#' + t[I.TID], { txt: D.assuntos[t[I.SUBJ]] }, { html: badge(statusKey(t)) },
+      { html: FILA_LABEL[t[I.FILA]] ? `<span class="${alerta(t) ? 'alert-txt' : ''}">${FILA_LABEL[t[I.FILA]]} há ${fmtH(esperaH(t))}</span>` : '–' },
+      fmtData(t[I.AB]), fmtH(t[I.TPROC]), fmtH(t[I.TRESP]),
+      fmt(t[I.NMSG]), fmt(t[I.NTROCAS]),
+      { txt: transferido(t) ? `${tipoTransf(t)} · ${D.assuntos[t[I.TR_DE]] || '?'} → ${D.assuntos[t[I.TR_PARA]] || '?'}` : '' },
+      { txt: D.analistas[t[I.AN]] }, { txt: D.consultores[t[I.CONS]] },
+      { txt: D.escritorios[t[I.ESC]] }, { txt: deptOf(t) },
+    ] })));
+}
+
+// ═══════════════════════════════ Componentes ═══════════════════════════════
+
+/** Barras verticais em SVG (empilhadas ou não). */
+function barChart(labels, series, opt = {}){
+  if (!labels.length) return '<div class="empty">Sem dados no recorte</div>';
+  const W = 900, H = 240, pl = 44, pr = 10, pt = 12, pb = 34;
+  const n = labels.length, iw = W - pl - pr, ih = H - pt - pb, bw = iw / n;
+  const tot = labels.map((_, i) => opt.stacked ? series.reduce((a, s) => a + s.values[i], 0) : Math.max(...series.map(s => s.values[i])));
+  let max = Math.max(1, ...tot, opt.refLine && tot.some(v => v) ? opt.refLine : 0);
+  const step = Math.pow(10, Math.floor(Math.log10(max))) * ([1, 2, 5].find(m => max / (Math.pow(10, Math.floor(Math.log10(max))) * m) <= 5) || 10);
+  max = Math.ceil(max / step) * step;
+  const y = v => pt + ih - v / max * ih;
+  const fmtV = opt.fmtV || fmt;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img">`;
+  for (let v = 0; v <= max; v += step){
+    s += `<line class="gridline" x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}"/>`;
+    s += `<text class="axis" x="${pl - 6}" y="${y(v) + 3}" text-anchor="end">${fmt(v)}</text>`;
+  }
+  const cada = Math.ceil(n / 18), gap = Math.min(6, bw * 0.25);
+  labels.forEach((lb, i) => {
+    const x = pl + i * bw + gap / 2, w = Math.max(1, bw - gap);
+    let acc = 0;
+    for (const se of series){
+      const v = se.values[i]; if (!v) continue;
+      const y0 = opt.stacked ? y(acc + v) : y(v), h = (opt.stacked ? y(acc) : y(0)) - y0;
+      s += `<rect x="${x}" y="${y0}" width="${w}" height="${Math.max(0, h)}" rx="2" fill="${se.cor}"><title>${esc(lb)} · ${esc(se.label)}: ${fmtV(v)}</title></rect>`;
+      if (opt.stacked) acc += v;
+    }
+    if (i % cada === 0) s += `<text class="axis" x="${x + w / 2}" y="${H - pb + 14}" text-anchor="middle">${esc(lb)}</text>`;
+    if (n <= 24 && tot[i]) s += `<text class="axis" x="${x + w / 2}" y="${y(tot[i]) - 4}" text-anchor="middle" style="font-weight:700;fill:var(--ink)">${fmtV(tot[i])}</text>`;
+  });
+  if (opt.refLine && opt.refLine <= max){
+    s += `<line x1="${pl}" x2="${W - pr}" y1="${y(opt.refLine)}" y2="${y(opt.refLine)}" stroke="var(--danger)" stroke-dasharray="4 4"/>`;
+    s += `<text class="axis" x="${W - pr}" y="${y(opt.refLine) - 4}" text-anchor="end" style="fill:var(--danger)">SLA ${opt.refLine}h</text>`;
+  }
+  return s + '</svg>';
+}
+
+function donut(partes, centro, sub){
+  const tot = partes.reduce((a, p) => a + p.v, 0), r = 52, c = 2 * Math.PI * r;
+  let off = 0, s = `<svg viewBox="0 0 140 140" width="140" height="140"><circle cx="70" cy="70" r="${r}" fill="none" stroke="var(--surface-2)" stroke-width="18"/>`;
+  if (tot) for (const p of partes){
+    const len = p.v / tot * c;
+    s += `<circle cx="70" cy="70" r="${r}" fill="none" stroke="${p.cor}" stroke-width="18" stroke-dasharray="${len} ${c - len}" stroke-dashoffset="${-off}" transform="rotate(-90 70 70)"/>`;
+    off += len;
+  }
+  return s + `<text x="70" y="70" text-anchor="middle" style="font-size:20px;font-weight:800;fill:var(--brand)">${centro}</text>
+    <text x="70" y="88" text-anchor="middle" class="axis">${sub}</text></svg>`;
+}
+
+function hbars(el, itens, opt = {}){
+  el.innerHTML = '';
+  if (!itens.length){ el.innerHTML = '<div class="empty">Sem dados no recorte</div>'; return; }
+  const max = Math.max(1, ...itens.map(i => i.valor));
+  for (const it of itens){
+    const row = document.createElement('div');
+    row.className = 'hbar-row' + (it.sel ? ' sel' : '') + (opt.estatico ? ' static' : '');
+    row.innerHTML = `<div class="hbar-label" title="${esc(it.label)}">${esc(it.label)}${it.extra ? `<small>${esc(it.extra)}</small>` : ''}</div>
+      <div class="hbar-count">${esc(it.texto ?? fmt(it.valor))}</div>
+      <div class="hbar-track"><div class="hbar-fill ${it.classe || ''}" style="width:${it.valor / max * 100}%"></div></div>`;
+    if (it.onClick) row.onclick = it.onClick;
+    el.appendChild(row);
+  }
+}
+
+/** cells: string (texto já formatado) | {txt} (texto, escapado) | {html} */
+function tabela(el, headers, rows){
+  const cell = (c, i) => {
+    if (c != null && typeof c === 'object'){
+      if ('html' in c) return `<td${i === 0 || c.num ? '' : ' class="txt"'}>${c.html}</td>`;
+      return `<td class="txt" title="${esc(c.txt)}">${esc(c.txt || '–')}</td>`;
+    }
+    return `<td>${esc(c)}</td>`;
+  };
+  // Título alinhado como a coluna: texto à esquerda, números à direita
+  const ehTexto = i => { const c = rows[0] && rows[0].cells[i]; return i === 0 || (c != null && typeof c === 'object' && !c.num); };
+  el.innerHTML = `<thead><tr>${headers.map((h, i) => `<th${ehTexto(i) ? ' class="txt"' : ''}>${esc(h)}</th>`).join('')}</tr></thead><tbody></tbody>`;
+  const tb = el.querySelector('tbody');
+  if (!rows.length){ tb.innerHTML = `<tr><td colspan="${headers.length}" class="empty">Sem dados no recorte</td></tr>`; return; }
+  for (const r of rows){
+    const tr = document.createElement('tr');
+    if (r.onClick){ tr.className = 'click' + (r.sel ? ' sel' : ''); tr.onclick = r.onClick; }
+    tr.innerHTML = r.cells.map(cell).join('');
+    tb.appendChild(tr);
+  }
+}
+const barCell = (v, max) => ({ num: true, html: `<div class="bar-cell"><div class="bg" style="width:${v / max * 100}%"></div><span>${fmt(v)}</span></div>` });
+const alertaCell = n => ({ num: true, html: `<span class="${n ? 'alert-txt' : ''}">${fmt(n)}</span>` });
+const badge = s => `<span class="badge"><span class="dot" style="background:${ST_COR[s] || 'var(--c6)'}"></span>${esc(ST_LABEL[s] || s)}</span>`;
+
+// ═══════════════════════════════ Filtros / controles ═══════════════════════
+function toggleSet(set, v){ set.has(v) ? set.delete(v) : set.add(v); }
+
+function renderFiltrosAtivos(){
+  const chips = [];
+  for (const s of state.status) chips.push([ST_LABEL[s] || s, () => state.status.delete(s)]);
+  if (state.dept) chips.push([state.dept, () => state.dept = '']);
+  if (state.subj !== '') chips.push([D.assuntos[state.subj], () => state.subj = '']);
+  if (state.esc !== '') chips.push([D.escritorios[state.esc], () => state.esc = '']);
+  if (state.an !== '') chips.push([D.analistas[state.an], () => state.an = '']);
+  for (const tp of state.transf) chips.push([tp, () => state.transf.delete(tp)]);
+  for (const f of state.fila) chips.push([FILA_LABEL[f], () => state.fila.delete(f)]);
+  const el = $('activeFilters'); el.innerHTML = '';
+  for (const [txt, limpar] of chips){
+    const c = document.createElement('span'); c.className = 'filter-chip';
+    c.innerHTML = `${esc(txt)} <span class="x" title="Remover">×</span>`;
+    c.querySelector('.x').onclick = () => { limpar(); sincronizarControles(); render(); };
+    el.appendChild(c);
+  }
+}
+
+function preencherSelect(sel, opcoes){
+  for (const [v, txt] of opcoes){ const o = document.createElement('option'); o.value = v; o.textContent = txt; sel.appendChild(o); }
+}
+const porNome = lista => lista.map((n, i) => [String(i), n]).sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
+
+function sincronizarControles(){
+  $('fDept').value = state.dept; $('fSubj').value = state.subj; $('fEsc').value = state.esc; $('fAn').value = state.an;
+  $('fFrom').value = state.from; $('fTo').value = state.to;
+  document.querySelectorAll('#fStatus .pill').forEach(p => p.classList.toggle('on', state.status.has(p.dataset.s)));
+  document.querySelectorAll('#fTransf .pill').forEach(p => p.classList.toggle('on', state.transf.has(p.dataset.s)));
+  document.querySelectorAll('#fFila .pill').forEach(p => p.classList.toggle('on', state.fila.has(+p.dataset.s)));
+}
+
+function aplicarPreset(p){
+  const ano = MAX_DIA.slice(0, 4);
+  const tri = { q1: ['01-01', '03-31'], q2: ['04-01', '06-30'], q3: ['07-01', '09-30'], q4: ['10-01', '12-31'] };
+  if (tri[p]){ state.from = `${ano}-${tri[p][0]}`; state.to = `${ano}-${tri[p][1]}`; }
+  else if (p === '30d'){ const d = new Date(MAX_DIA + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - 29); state.from = d.toISOString().slice(0, 10); state.to = MAX_DIA; }
+  else { state.from = MIN_DIA; state.to = MAX_DIA; }
+  if (state.from < MIN_DIA) state.from = MIN_DIA;
+  if (state.to > MAX_DIA) state.to = MAX_DIA;
+}
+
+function guardar(k, v){ try { localStorage.setItem('bko_' + k, v); } catch (e) {} }
+function ler(k){ try { return localStorage.getItem('bko_' + k); } catch (e) { return null; } }
+function setTema(t){
+  document.documentElement.dataset.theme = t;
+  document.querySelectorAll('#themeToggle button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  guardar('tema', t);
+}
+
+function init(){
+  // Dados gerados por uma versão anterior do Code.gs têm outro formato de linha
+  if (D && D.versao !== VERSAO_DADOS){
+    $('semDados').innerHTML = 'Os dados salvos estão num formato antigo. No editor do Apps Script, rode <b>atualizarDados</b> uma vez.';
+    D = null;
+  }
+  if (!D || !D.t || !D.t.length){ $('semDados').style.display = ''; document.querySelectorAll('.view').forEach(v => v.classList.remove('on')); return; }
+
+  const dias = D.t.map(t => t[I.AB].slice(0, 10)).filter(Boolean).sort();
+  MIN_DIA = dias[0]; MAX_DIA = D.geradoEm.slice(0, 10) > dias[dias.length - 1] ? D.geradoEm.slice(0, 10) : dias[dias.length - 1];
+  state.from = MIN_DIA; state.to = MAX_DIA;
+  $('updated').textContent = `Atualizado em ${fmtData(D.geradoEm)}`;
+
+  for (const s of D.statusOrdem){
+    const b = document.createElement('button'); b.className = 'pill'; b.dataset.s = s;
+    b.innerHTML = `<span class="dot" style="background:${ST_COR[s] || 'var(--c6)'}"></span>${esc(ST_LABEL[s] || s)}`;
+    b.onclick = () => { toggleSet(state.status, s); sincronizarControles(); render(); };
+    $('fStatus').appendChild(b);
+  }
+  for (const f of [FILA_BO, FILA_CONS]){
+    const b = document.createElement('button'); b.className = 'pill'; b.dataset.s = f;
+    b.innerHTML = `<span class="dot" style="background:${FILA_COR[f]}"></span>${FILA_LABEL[f]}`;
+    b.onclick = () => { toggleSet(state.fila, f); sincronizarControles(); render(); };
+    $('fFila').appendChild(b);
+  }
+  for (const tp of [...(D.tiposTransf || []), SEM_TRANSF]){
+    const b = document.createElement('button'); b.className = 'pill'; b.dataset.s = tp;
+    b.innerHTML = `<span class="dot" style="background:${TIPO_COR[tp] || 'var(--c5)'}"></span>${esc(tp)}`;
+    b.onclick = () => { toggleSet(state.transf, tp); sincronizarControles(); render(); };
+    $('fTransf').appendChild(b);
+  }
+  const deptos = [...new Set(D.t.map(deptOf))].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  preencherSelect($('fDept'), deptos.map(d => [d, d]));
+  const usados = new Set(D.t.map(t => t[I.SUBJ]));
+  preencherSelect($('fSubj'), porNome(D.assuntos).filter(([i]) => usados.has(+i)));
+  preencherSelect($('fEsc'), porNome(D.escritorios));
+  preencherSelect($('fAn'), porNome(D.analistas));
+
+  const bind = (id, k) => $(id).onchange = e => { state[k] = e.target.value; render(); };
+  bind('fDept', 'dept'); bind('fSubj', 'subj'); bind('fEsc', 'esc'); bind('fAn', 'an');
+  $('fFrom').onchange = e => { state.from = e.target.value || MIN_DIA; render(); };
+  $('fTo').onchange = e => { state.to = e.target.value || MAX_DIA; render(); };
+  document.querySelectorAll('#presets .pill').forEach(b => b.onclick = () => { aplicarPreset(b.dataset.preset); sincronizarControles(); render(); });
+  $('btnClear').onclick = () => {
+    Object.assign(state, { dept: '', subj: '', esc: '', an: '', from: MIN_DIA, to: MAX_DIA, busca: '' });
+    state.status.clear(); state.transf.clear(); state.fila.clear(); $('busca').value = ''; sincronizarControles(); render();
+  };
+
+  document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
+    activeTab = b.dataset.tab;
+    document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+    document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'view-' + activeTab));
+    $('granTabs').style.visibility = ['geral', 'sla', 'transf'].includes(activeTab) ? '' : 'hidden';
+    guardar('aba', activeTab);
+    render();
+  });
+  document.querySelectorAll('#granTabs button').forEach(b => b.onclick = () => {
+    state.gran = b.dataset.g;
+    document.querySelectorAll('#granTabs button').forEach(x => x.classList.toggle('on', x === b));
+    render();
+  });
+  let t;
+  $('busca').oninput = e => { clearTimeout(t); t = setTimeout(() => { state.busca = e.target.value; render(); }, 200); };
+  document.querySelectorAll('select.limite').forEach(sel => sel.onchange = () => { limites[sel.dataset.k] = +sel.value; render(); });
+  $('btnDensity').onclick = () => { document.body.classList.toggle('dense'); guardar('dense', document.body.classList.contains('dense') ? '1' : ''); };
+  document.querySelectorAll('#themeToggle button').forEach(b => b.onclick = () => setTema(b.dataset.t));
+
+  setTema(ler('tema') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+  if (ler('dense')) document.body.classList.add('dense');
+  sincronizarControles();
+  const aba = ler('aba');
+  const btn = aba && document.querySelector(`#tabs button[data-tab="${aba}"]`);
+  if (btn) btn.click(); else render();
+}
+/** gzip + base64 (como salvo pelo Code.gs) -> objeto. Descompacta no navegador. */
+async function descompactar(b64){
+  const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return JSON.parse(await new Response(stream).text());
+}
+
+function falhaCarga(msg){
+  $('carregando').textContent = 'Não foi possível carregar os dados: ' + msg;
+}
+
+google.script.run
+  .withSuccessHandler(async b64 => {
+    try {
+      D = b64 ? await descompactar(b64) : null;
+    } catch (e) { falhaCarga(e.message); return; }
+    $('carregando').style.display = 'none';
+    init();
+  })
+  .withFailureHandler(e => falhaCarga(e.message || String(e)))
+  .getDados();
+</script>
+</body>
+</html>
