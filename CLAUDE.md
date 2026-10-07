@@ -4,34 +4,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Streamlit dashboard for BKO support-ticket analysis (Portuguese codebase/UI). A user uploads a ticket export (CSV `;`-separated or XLSX); the app runs ETL, consolidates rows per ticket, computes SLA/funnel/grouping analyses, and offers XLSX/HTML export plus SMTP e-mail. `PROJETO.md` is the detailed reference (function tables, column schemas, result dict shape) — consult it before large changes and keep it in sync.
+BKO support-ticket dashboard (Portuguese codebase/UI), running as a **Google Apps Script web app embedded in Google Sites**. Data comes straight from Metabase (Cloud, question **274 "Ticket x Productions"**, native SQL, one row per ticket message). `apps_script/LEIAME.md` holds the deployment steps and data notes. Keep it in sync.
+
+`legado_streamlit/` is the retired Streamlit version (manual CSV upload). Do not extend it. Its response-time and analyst metrics are known to be wrong (see its README).
 
 ## Commands
 
-```bash
-pip install -r requirements.txt
-streamlit run dashboard_bko.py          # or rodar_dashboard.bat (expects venv at C:\bko_env)
+There is no build, lint, or test suite. Code is deployed by pasting the files into the Apps Script editor (see LEIAME). Local tooling:
 
-# Standalone CLI pipeline (same steps, without the dashboard)
-python validador_tabela_ticket.py <export.csv|xlsx> [out_ETL.csv]
-python processador_relatorio_data.py <arquivo_ETL.csv> [relatorio.xlsx]
+```bash
+pip install python-dotenv pandas
+python apps_script/testar_metabase.py 2026-09-01 2026-09-30   # reads METABASE_* from .env; prints params, SQL, columns; saves metabase_amostra.csv
+node -e "new Function(require('fs').readFileSync('apps_script/Code.gs','utf8'))"   # syntax check
 ```
 
-No test suite, linter, or build step exists. Verify changes by running the app (or the CLI scripts) against a real export CSV; sample `ticket_x_productions_*.csv` files may be present locally but data files are gitignored (except `Departamentos.xlsx`).
+To verify `Code.gs` changes, run it in Node with a `vm` context that stubs `Utilities` (parseCsv, gzip/ungzip, base64, newBlob), `PropertiesService`, `CacheService`, `DriveApp` and `UrlFetchApp`. `UrlFetchApp` can call the real Metabase through a child process. Then compare the output against an independent pandas computation on `metabase_amostra.csv`. To preview `Index.html`, inject a fake `google.script.run` whose `getDados()` returns the gzip+base64 payload, and serve the file locally.
 
 ## Architecture
 
-Three modules form a linear pipeline:
+`apps_script/Code.gs` (server) → JSON in Drive → `apps_script/Index.html` (client renders everything, cross-filtering in the browser).
 
-1. `validador_tabela_ticket.py` (imported as `vtk`) — encoding auto-detection (latin-1/utf-8/cp1252/utf-8-sig), double-encoding repair (`_fix_residual_chars`), splitting combined date+time columns (`open_at` → `open_at` + `hora_open`, etc., BR or ISO formats), validation warnings.
-2. `processador_relatorio_data.py` (imported as `prd`) — `_parse_datetimes` rebuilds `dt_*` columns from the split pairs; `consolidate()` is the core step that collapses N message rows per `ticket_id` into one record (status priority `closed > processing > open`, SLA hours, transfer counts, last analyst/consultor); `make_*` functions build each analysis DataFrame; `write_xlsx` writes formatted sheets with openpyxl charts.
-3. `dashboard_bko.py` — Streamlit UI. `executar_pipeline()` re-implements the orchestration of `vtk` + `prd` in memory (it does **not** call `prd.process()`), additionally merging `Departamentos.xlsx` (LEFT JOIN on `ticket_subject`, fallback `"Sem Departamento"`) and producing `Por_Departamento`. A change to the pipeline steps usually needs to be made in both `executar_pipeline()` and `prd.process()`.
-
-Key details:
-- `prd.AGORA` is a module-level timestamp used as "now" for open tickets' SLA; the dashboard reassigns it at the start of each pipeline run. `SLA_ALERTA_H = 24` drives alerts.
-- Results are cached in `st.session_state` keyed by `uploaded.file_id` (`result_*`, `pdf_*`, `html_*`); invalidating requires changing/clearing these keys.
-- Exports: `_build_html_export` (self-contained dark-theme HTML with Plotly via CDN — the primary export, meant to be printed to PDF from the browser) and `_build_pdf` (WeasyPrint → xhtml2pdf fallback; plus an fpdf2-based path). The PDF is still generated but its download button is hidden.
-- Chart image rendering uses kaleido; WeasyPrint needs the system libs in `packages.txt` (Streamlit Cloud deployment).
-- SMTP config: `st.secrets["email"]` (`.streamlit/secrets.toml`) first, then `EMAIL_SMTP_*` env vars (`.env` via python-dotenv). See the `.example` files.
-- Status colors are shared conventions: fechado `#2CA02C`, processo `#FF7F0E`, aberto `#1F77B4`, alerta `#D62728`, principal `#1F3864` (duplicated in both `dashboard_bko.py` and `processador_relatorio_data.py`).
-- Sidebar widgets live in a single `with st.sidebar:` block and PDF generation runs outside it, deliberately, to avoid Streamlit 1.57+ context conflicts.
+- **Fetch:** `conectarMetabase_` logs in (`METABASE_API_KEY` or user/password from Script Properties) and reads the card's template tags. `baixarMetabaseCsv_` POSTs `/api/card/274/query/csv` with `start_date`/`final_date` (text, `yyyy-MM-dd`, filtering on ticket **open date**). It fetches **one month per request**, because the `ticket_message` column makes a month ~10 MB and UrlFetch caps responses at 50 MB.
+- **Incremental update:** `atualizarDados()` (daily trigger, 6h) refetches the last `JANELA_DIAS` (60) days and replaces those tickets in the stored payload, keeping older ones. `cargaCompleta()` refetches everything since `METABASE_DATA_INICIO`. Because the filter is on open date, a ticket always lands entirely in one month or window. Older open tickets only get status changes via `cargaCompleta`.
+- **Consolidation** (`agrupar_` → `consolidar_`, ported from the legacy `processador_relatorio_data.consolidate`): N message rows become one record per ticket. Status priority is `closed > processing > open`. Key business rules:
+  - First response = first message with `sender_type = Admin`. Do **not** use `answered_at`: it is `it.updated_at` in the SQL.
+  - `fila`: for non-closed tickets, a last message from Admin means "aguardando consultor"; otherwise "aguardando BO". The 24h SLA alert applies only to "aguardando BO", measured from the last message.
+  - Analyst = last Admin sender.
+  - Subject transfers come from the `transfer_*`/`last_transference` columns (constant per ticket, last transfer only). "Trocas de resp." is the old sender-change count, a different metric.
+- **Payload format** (`codificar_`/`decodificar_`): strings are dictionary-encoded into index lists. Each ticket is a positional array, and the field order is documented above `codificar_`. Transfer fields are appended only when present. Bump `VERSAO_DADOS` in **both** `Code.gs` and `Index.html` whenever the row layout changes. A stored payload with another version forces a full reload.
+- **Storage/serving:** the payload is gzip + base64 in a Drive file (`DADOS_FILE_ID` property), also cached in `CacheService` in 90 KB slices. `doGet` serves only the HTML shell. The page calls `google.script.run.getDados()` and decompresses with `DecompressionStream`.
+- **Departments:** `Departamentos.gs` maps subject → department and is generated from `Departamentos.xlsx` (repo root). Unmapped subjects become "Sem Departamento".
+- **UI conventions in `Index.html`:** W1 palette as CSS tokens with light/dark themes. Every visual derives from `filtrados()` (sidebar state plus click-to-filter). Use `tabela()`/`hbars()`/`barChart()` for new visuals. Long lists use the `select.limite` + `limitar(k, lista)` pattern. Lists over the ~57k tickets cap at 500 rows instead of "Todos".
+- **Privacy:** `ticket_message` contains client personal data. Never log it (see `testarConexao`).
