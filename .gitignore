@@ -17,7 +17,7 @@ venv/
 .venv/
 
 # Streamlit secrets — nunca versionar
-.streamlit/secrets.toml
+**/.streamlit/secrets.toml
 
 # OS
 .DS_Store
