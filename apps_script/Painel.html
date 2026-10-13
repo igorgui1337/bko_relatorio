@@ -66,6 +66,17 @@
   .kpi-value{font-size:20px;font-weight:800;color:var(--brand);line-height:1.25;font-variant-numeric:tabular-nums}
   .kpi.bad .kpi-value{color:var(--danger)}
   .kpi-sub{font-size:10.5px;color:var(--muted);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* Contexto do número (variação contra o período anterior) */
+  .delta{font-size:10.5px;font-weight:700;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+  .delta.bom{color:var(--ok)} .delta.ruim{color:var(--danger)} .delta.neutro{color:var(--muted)}
+  /* Quadro de ação: diz o que fazer com os números (canto superior esquerdo, onde o olho começa) */
+  .acao{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--danger);border-radius:10px;
+    padding:10px 14px;margin-bottom:12px;box-shadow:var(--shadow-sm)}
+  .acao.ok{border-left-color:var(--ok)}
+  .acao .acao-rot{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+  .acao .acao-tit{font-size:15px;font-weight:800;color:var(--ink);margin:2px 0 4px}
+  .acao ul{margin:0;padding-left:18px;font-size:12.5px;color:var(--ink)}
+  .acao li{margin:1px 0}
 
   .card{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:13px 15px 14px;box-shadow:var(--shadow-sm);min-width:0}
   .card h3{margin:0 0 2px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
@@ -136,6 +147,8 @@
       <button class="btn ghost" id="btnAplicar">Buscar</button>
     </div>
 
+    <div class="acao" id="acao"></div>
+
     <div class="card" style="margin-bottom:14px">
       <h3>Por departamento</h3>
       <div class="card-sub" id="subDepto">abertos e 1ª resposta no período · em dia e atrasos de agora</div>
@@ -144,18 +157,18 @@
 
     <div class="secao" id="secPeriodo">No período</div>
     <div class="kpis">
-      <div class="kpi"><div class="kpi-label">Abertos</div><div class="kpi-value" id="kAbertos">–</div><div class="kpi-sub" id="kAbertosSub"></div></div>
-      <div class="kpi ok"><div class="kpi-label">Fechados</div><div class="kpi-value" id="kFech">–</div><div class="kpi-sub" id="kFechSub"></div></div>
-      <div class="kpi"><div class="kpi-label">1ª resposta (mediana)</div><div class="kpi-value" id="kResp">–</div><div class="kpi-sub">da abertura à 1ª resposta do BO</div></div>
-      <div class="kpi warn"><div class="kpi-label">Transferidos</div><div class="kpi-value" id="kTransf">–</div><div class="kpi-sub" id="kTransfSub"></div></div>
+      <div class="kpi"><div class="kpi-label">Abertos</div><div class="kpi-value" id="kAbertos">–</div><div class="kpi-sub" id="kAbertosSub"></div><div class="delta" id="dAbertos"></div></div>
+      <div class="kpi ok"><div class="kpi-label">Fechados</div><div class="kpi-value" id="kFech">–</div><div class="kpi-sub" id="kFechSub"></div><div class="delta" id="dFech"></div></div>
+      <div class="kpi"><div class="kpi-label">1ª resposta (mediana)</div><div class="kpi-value" id="kResp">–</div><div class="kpi-sub">da abertura à 1ª resposta do BO</div><div class="delta" id="dResp"></div></div>
+      <div class="kpi warn"><div class="kpi-label">Transferidos</div><div class="kpi-value" id="kTransf">–</div><div class="kpi-sub" id="kTransfSub"></div><div class="delta" id="dTransf"></div></div>
     </div>
 
     <div class="secao" id="secAgora">Agora · tickets aguardando o BackOffice</div>
     <div class="kpis">
-      <div class="kpi warn"><div class="kpi-label">Aguardando BO</div><div class="kpi-value" id="kBO">–</div><div class="kpi-sub">vez do BackOffice responder</div></div>
-      <div class="kpi ok"><div class="kpi-label">Em dia</div><div class="kpi-value" id="kDia">–</div><div class="kpi-sub">dentro de 1 dia útil</div></div>
-      <div class="kpi bad"><div class="kpi-label">Atraso · sem resposta</div><div class="kpi-value" id="kAtrResp">–</div><div class="kpi-sub">consultor sem retorno há mais de 1 dia útil</div></div>
-      <div class="kpi bad"><div class="kpi-label">Atraso · transferência</div><div class="kpi-value" id="kAtrTransf">–</div><div class="kpi-sub">sem retorno após a transferência</div></div>
+      <div class="kpi warn"><div class="kpi-label">Aguardando BO</div><div class="kpi-value" id="kBO">–</div><div class="kpi-sub">vez do BackOffice responder</div><div class="delta neutro" id="cBO"></div></div>
+      <div class="kpi ok"><div class="kpi-label">Em dia</div><div class="kpi-value" id="kDia">–</div><div class="kpi-sub">dentro de 1 dia útil</div><div class="delta neutro" id="cDia"></div></div>
+      <div class="kpi bad"><div class="kpi-label">Atraso · sem resposta</div><div class="kpi-value" id="kAtrResp">–</div><div class="kpi-sub">consultor sem retorno há mais de 1 dia útil</div><div class="delta neutro" id="cAtrResp"></div></div>
+      <div class="kpi bad"><div class="kpi-label">Atraso · transferência</div><div class="kpi-value" id="kAtrTransf">–</div><div class="kpi-sub">sem retorno após a transferência</div><div class="delta neutro" id="cAtrTransf"></div></div>
     </div>
 
     <div class="card" style="margin-bottom:12px">
@@ -222,12 +235,87 @@ function janela(){
   if (_janelaDe !== de || !_janela || _janela.D !== D){ _janela = D.t.filter(t => t[I.AB].slice(0, 10) >= de); _janela.D = D; _janelaDe = de; }
   return _janela;
 }
-const doPeriodo = () => janela().filter(t => { const d = t[I.AB].slice(0, 10); return d >= periodo.de && d <= periodo.ate; });
+const doIntervalo = (de, ate) => janela().filter(t => { const d = t[I.AB].slice(0, 10); return d >= de && d <= ate; });
+const doPeriodo = () => doIntervalo(periodo.de, periodo.ate);
+
+/**
+ * Números de um intervalo (pela abertura) como estavam no momento `corte` ("yyyy-MM-dd HH:mm").
+ * O período atual usa a última atualização; o anterior, o mesmo ponto do tempo deslocado — assim
+ * os tickets de lá não ganham dias a mais para serem respondidos, fechados ou transferidos.
+ * Fechamento aproximado pela última mensagem (o Metabase não traz a data de fechamento).
+ */
+function numerosDe(L, corte){
+  const A = L.filter(t => t[I.AB] <= corte);
+  const fech = A.filter(t => fechado(t) && (t[I.ULT] || t[I.AB]) <= corte).length;
+  return { abertos: A.length, fechados: fech, pctFech: A.length ? fech / A.length * 100 : null,
+           resp: mediana(A.filter(t => t[I.TRESP] != null && t[I.RESP] && t[I.RESP] <= corte).map(t => t[I.TRESP])),
+           transf: A.filter(t => transferido(t) && t[I.TR_DT] <= corte).length };
+}
+/** "yyyy-MM-dd HH:mm" deslocado n dias. */
+const deslocar = (dt, n) => somaDias(dt.slice(0, 10), n) + dt.slice(10);
+
+/**
+ * Intervalo de comparação, do mesmo tamanho, imediatamente antes, medido no mesmo ponto do tempo
+ * (corte = última atualização deslocada pelo mesmo número de dias). Semana atual em andamento:
+ * compara com a semana anterior até o mesmo dia e hora. Sem base na janela de 120 dias: null.
+ */
+function intervaloAnterior(){
+  const n = diasDe(periodo.de, periodo.ate).length;
+  const de = somaDias(periodo.de, -n), ate = somaDias(periodo.ate, -n);
+  const emAndamento = periodo.ate >= hoje();
+  const rotulo = periodo.semana ? (emAndamento ? 'mesmo momento da semana anterior' : 'semana anterior') : `${diaCurto(de)}–${diaCurto(ate)}`;
+  return de < inicioJanela() ? null : { de, ate, rotulo, corte: deslocar(D.geradoEm, -n) };
+}
+
+/**
+ * Linha de contexto do cartão ("information without context is spam").
+ * modo: 'pct' (variação %), 'pp' (pontos percentuais) · melhor: 'sobe' | 'desce' | null (só informa).
+ */
+function variacao(el, atual, ant, modo, melhor, rotulo){
+  if (!rotulo){ el.textContent = 'sem base para comparar'; el.className = 'delta neutro'; return; }
+  if (atual == null || ant == null || (modo !== 'pp' && !ant)){ el.textContent = `sem dado em ${rotulo}`; el.className = 'delta neutro'; return; }
+  const dif = modo === 'pp' ? atual - ant : (atual - ant) / ant * 100;
+  const igual = Math.abs(dif) < 0.05;
+  const seta = igual ? '=' : dif > 0 ? '▲' : '▼';
+  el.textContent = `${seta} ${igual ? '' : Math.abs(dif).toFixed(1).replace('.', ',') + (modo === 'pp' ? ' p.p.' : '%') + ' '}vs ${rotulo}`;
+  el.className = 'delta ' + (!melhor || igual ? 'neutro' : ((dif > 0) === (melhor === 'sobe') ? 'bom' : 'ruim'));
+}
+
+/**
+ * Quadro de ação ("removing information creates room for direction"): em vez de só mostrar
+ * números, diz onde agir — o departamento que concentra os atrasos, o atraso mais antigo e o que
+ * vence hoje se ninguém responder.
+ */
+function acaoAgora(){
+  const porDep = new Map(); let total = 0, maisAntigo = null, venceHoje = 0, bo = 0;
+  for (const t of janela()){
+    if (DEPTO_FORA.has(deptOf(t))) continue;
+    const r = refBO(t); if (!r) continue;
+    bo++;
+    if (!r.atrasado){ if (prazoUtil(r.ref).slice(0, 10) === hoje()) venceHoje++; continue; }
+    total++;
+    const d = porDep.get(deptOf(t)) || { ar: 0, at: 0 };
+    r.motivo === 'transferencia' ? d.at++ : d.ar++;
+    porDep.set(deptOf(t), d);
+    if (!maisAntigo || esperaH(t) > esperaH(maisAntigo)) maisAntigo = t;
+  }
+  const vence = venceHoje ? `${fmt(venceHoje)} ticket${venceHoje > 1 ? 's' : ''} em dia ${venceHoje > 1 ? 'vencem' : 'vence'} hoje se ninguém responder.` : '';
+  if (!total) return { ok: true, titulo: bo ? 'Nenhum ticket em atraso agora.' : 'Nada aguardando o BackOffice agora.',
+                       itens: [bo ? `${fmt(bo)} aguardando o BO, todos dentro de 1 dia útil.` : '', vence].filter(Boolean) };
+  const [dep, d] = [...porDep.entries()].sort((a, b) => (b[1].ar + b[1].at) - (a[1].ar + a[1].at))[0];
+  const partes = [d.ar ? `${fmt(d.ar)} sem resposta` : '', d.at ? `${fmt(d.at)} por transferência` : ''].filter(Boolean).join(' e ');
+  return { ok: false,
+    titulo: `Comece por ${dep}: ${fmt(d.ar + d.at)} dos ${fmt(total)} atrasos (${pct(d.ar + d.at, total)}).`,
+    itens: [
+      `${dep}: ${partes}.`,
+      `Atraso mais antigo: #${maisAntigo[I.TID]} · ${D.assuntos[maisAntigo[I.SUBJ]] || '(sem assunto)'} (${deptOf(maisAntigo)}), esperando há ${fmtH(esperaH(maisAntigo))}.`,
+      vence,
+    ].filter(Boolean) };
+}
 
 /** Números do período (pela abertura) + retrato de agora (tickets da janela de 120 dias). */
 function resumo(){
-  const L = doPeriodo(), T = L.filter(transferido);
-  const fech = L.filter(fechado).length;
+  const L = doPeriodo();
   const agora = { bo: 0, emDia: 0, atrResp: 0, atrTransf: 0 };
   for (const t of janela()){
     if (DEPTO_FORA.has(deptOf(t))) continue;
@@ -235,8 +323,7 @@ function resumo(){
     agora.bo++;
     if (!r.atrasado) agora.emDia++; else if (r.motivo === 'transferencia') agora.atrTransf++; else agora.atrResp++;
   }
-  return { L, abertos: L.length, fechados: fech, pctFech: L.length ? fech / L.length * 100 : null,
-           resp: mediana(L.map(t => t[I.TRESP]).filter(h => h != null)), transf: T.length, agora };
+  return { L, ...numerosDe(L, D.geradoEm), agora };
 }
 
 function porDepartamento(L){
@@ -269,7 +356,11 @@ function render(){
   $('secAgora').textContent = `Agora · tickets abertos desde ${fmtDia(inicioJanela())} (últimos ${JANELA_DIAS} dias) aguardando o BackOffice`;
   $('subDepto').textContent = `abertos e 1ª resposta no período · em dia, atrasos e últ. transferência de agora (tickets desde ${fmtDia(inicioJanela())})`;
   $('kAbertos').textContent = fmt(r.abertos);
-  $('kAbertosSub').textContent = `${diasDe(periodo.de, periodo.ate < hoje() ? periodo.ate : hoje()).length} dia(s) no período`;
+  // Feriados no período explicam quedas de volume (ex.: 12/10) — contexto para não ler como melhora/piora
+  const diasAte = diasDe(periodo.de, periodo.ate < hoje() ? periodo.ate : hoje());
+  const fer = diasAte.filter(d => feriados(+d.slice(0, 4)).has(d)).map(diaCurto);
+  const uteis = diasAte.filter(diaUtil).length;
+  $('kAbertosSub').textContent = `${uteis} dia(s) útil(eis)` + (fer.length ? ` · feriado ${fer.join(', ')}` : '');
   $('kFech').textContent = fmt(r.fechados);
   $('kFechSub').textContent = `${pct(r.fechados, r.abertos)} dos abertos`;
   $('kResp').textContent = fmtH(r.resp);
@@ -279,6 +370,24 @@ function render(){
   $('kDia').textContent = fmt(r.agora.emDia);
   $('kAtrResp').textContent = fmt(r.agora.atrResp);
   $('kAtrTransf').textContent = fmt(r.agora.atrTransf);
+
+  // Contexto: período contra o anterior; "agora" como proporção do que aguarda o BO
+  const ant = intervaloAnterior(), a = ant && numerosDe(doIntervalo(ant.de, ant.ate), ant.corte), rot = ant && ant.rotulo;
+  variacao($('dAbertos'), r.abertos, a && a.abertos, 'pct', null, rot);
+  variacao($('dFech'), r.pctFech, a && a.pctFech, 'pp', 'sobe', rot);
+  variacao($('dResp'), r.resp, a && a.resp, 'pct', 'desce', rot);
+  variacao($('dTransf'), r.transf, a && a.transf, 'pct', 'desce', rot);
+  const atr = r.agora.atrResp + r.agora.atrTransf, bo = r.agora.bo;
+  $('cBO').textContent = `${fmt(atr)} em atraso (${pct(atr, bo)})`;
+  $('cDia').textContent = `${pct(r.agora.emDia, bo)} dos aguardando BO`;
+  $('cAtrResp').textContent = `${pct(r.agora.atrResp, bo)} dos aguardando BO`;
+  $('cAtrTransf').textContent = `${pct(r.agora.atrTransf, bo)} dos aguardando BO`;
+
+  // O que fazer agora
+  const ac = acaoAgora();
+  $('acao').className = 'acao' + (ac.ok ? ' ok' : '');
+  $('acao').innerHTML = `<div class="acao-rot">${ac.ok ? '✓ Situação' : '▶ Onde agir agora'}</div>
+    <div class="acao-tit">${esc(ac.titulo)}</div>${ac.itens.length ? `<ul>${ac.itens.map(i => `<li>${esc(i)}</li>`).join('')}</ul>` : ''}`;
 
 
   // Atrasos agora
@@ -336,6 +445,9 @@ function montarRelatorio(){
     <p style="${st.h}"><b>Relatório semanal de tickets · BackOffice</b></p>
     <p style="${st.p}">Semana de ${semana} · dados atualizados em ${fmtData(D.geradoEm).replace(' ', ' às ')} (Metabase).
       SLA de 1 dia útil: vence no mesmo horário do próximo dia útil. Considera tickets abertos desde ${fmtDia(inicioJanela())} (últimos ${JANELA_DIAS} dias).</p>
+    ${(() => { const ac = acaoAgora(); return `<p style="${st.h3}"><b>${ac.ok ? 'Situação' : 'Onde agir agora'}</b></p>
+      <p style="${st.p};margin:0 0 4px"><b>${esc(ac.titulo)}</b></p>
+      ${ac.itens.length ? `<ul style="${st.p};margin:0 0 6px;padding-left:18px">${ac.itens.map(i => `<li>${esc(i)}</li>`).join('')}</ul>` : ''}`; })()}
     <p style="${st.h3}"><b>Resumo da semana</b></p>${tabKpis}
     <p style="${st.h3}"><b>Por departamento</b></p>${tabDep}
     <p style="${st.h3}"><b>Situação por assunto</b></p>${titan}
