@@ -1,0 +1,126 @@
+<script>
+// ═════════════════════════════════════════════════════════════════════════════
+// Relatorio.html — tabela de tickets por assunto no formato do relatório do Titan,
+// e cópia para e-mail/Excel. Usado pelo Diretoria.html (?v=diretoria) e pelo
+// relatório semanal do Painel.html (?v=painel). Depende do Regras.html.
+// ═════════════════════════════════════════════════════════════════════════════
+const DEPTO_FORA = new Set(['Teste']);   // fora do relatório
+const nomeMes = ym => `${MES_PT[+ym.slice(5, 7) - 1]}/${ym.slice(2, 4)}`;
+function mesAnterior(ym, n){ let [y, m] = ym.split('-').map(Number); m -= n; while (m < 1){ m += 12; y--; } return `${y}-${String(m).padStart(2, '0')}`; }
+
+/**
+ * Uma linha por assunto. "Abertos" e "Em processo" usam o mês de referência (padrão: o mês
+ * da última atualização); "em dia" e "atraso" são o retrato de agora, de qualquer mês.
+ */
+function montarLinhas(mesRef){
+  const mesAtual = mesRef || D.geradoEm.slice(0, 7);
+  const meses = [mesAnterior(mesAtual, 2), mesAnterior(mesAtual, 1), mesAtual];
+  const porAssunto = new Map();
+  for (const t of D.t){
+    const depto = deptOf(t);
+    if (DEPTO_FORA.has(depto)) continue;
+    const k = t[I.SUBJ];
+    if (!porAssunto.has(k)) porAssunto.set(k, { assunto: D.assuntos[k] || '(sem assunto)', depto,
+      abertos: 0, proc: [0, 0, 0], emDia: 0, atrResp: 0, atrTransf: 0, maisAntiga: '', ultTransf: '' });
+    const r = porAssunto.get(k), mesAb = t[I.AB].slice(0, 7);
+
+    if (mesAb === mesAtual) r.abertos++;
+    const iMes = meses.indexOf(mesAb);
+    if (iMes >= 0 && !fechado(t)) r.proc[iMes]++;
+
+    const bo = refBO(t);
+    if (bo){
+      if (!bo.atrasado) r.emDia++;
+      else if (bo.motivo === 'transferencia') r.atrTransf++;
+      else r.atrResp++;
+      if (bo.motivo === 'resposta' && (!r.maisAntiga || bo.ref < r.maisAntiga)) r.maisAntiga = bo.ref;
+    }
+    if (!fechado(t) && transferido(t) && t[I.TR_DT] > r.ultTransf) r.ultTransf = t[I.TR_DT];
+  }
+  const linhas = [...porAssunto.values()]
+    .filter(r => r.abertos || r.emDia || r.atrResp || r.atrTransf || r.proc.some(Boolean))
+    .sort((a, b) => a.depto.localeCompare(b.depto, 'pt-BR')
+      || (b.emDia + b.atrResp + b.atrTransf) - (a.emDia + a.atrResp + a.atrTransf)
+      || b.abertos - a.abertos);
+  const soma = fn => linhas.reduce((s, r) => s + fn(r), 0);
+  const tot = { abertos: soma(r => r.abertos), proc: [0, 1, 2].map(i => soma(r => r.proc[i])),
+                emDia: soma(r => r.emDia), atrResp: soma(r => r.atrResp), atrTransf: soma(r => r.atrTransf) };
+  return { linhas, meses, mesAtual, tot };
+}
+
+const nTitan = v => v ? fmt(v) : '';   // zero fica em branco, como no relatório do Titan
+
+/** thead + tbody da tabela no formato do Titan (para innerHTML de um <table class="rel">). */
+function tabelaTitan({ linhas, meses, mesAtual, tot }){
+  const head = `<thead>
+    <tr><th rowspan="2">Assunto</th><th rowspan="2">Departamento</th><th rowspan="2">Abertos<br>${nomeMes(mesAtual)}</th>
+        <th colspan="3" class="grupo">Em processo</th><th rowspan="2">Tickets<br>em dia</th>
+        <th colspan="2" class="grupo">Tickets em atraso</th>
+        <th rowspan="2">Resposta do consultor<br>mais antiga</th><th rowspan="2">Últ. transferência<br>de assunto</th></tr>
+    <tr>${meses.map(m => `<th>${nomeMes(m)}</th>`).join('')}<th>Sem resposta</th><th>Transferência</th></tr></thead>`;
+  const corpo = linhas.map(r => `<tr class="${r.atrResp + r.atrTransf ? 'atraso' : ''}">
+      <td class="txt">${esc(r.assunto)}</td><td class="txt">${esc(r.depto)}</td><td>${nTitan(r.abertos)}</td>
+      ${r.proc.map(v => `<td>${nTitan(v)}</td>`).join('')}<td>${nTitan(r.emDia)}</td><td>${nTitan(r.atrResp)}</td><td>${nTitan(r.atrTransf)}</td>
+      <td class="dt">${fmtDia(r.maisAntiga)}</td><td class="dt">${fmtDia(r.ultTransf)}</td></tr>`).join('');
+  const total = `<tr class="total"><td class="txt">Total</td><td></td><td>${fmt(tot.abertos)}</td>
+      ${tot.proc.map(v => `<td>${fmt(v)}</td>`).join('')}<td>${fmt(tot.emDia)}</td><td>${fmt(tot.atrResp)}</td><td>${fmt(tot.atrTransf)}</td><td></td><td></td></tr>`;
+  return head + '<tbody>' + corpo + total + '</tbody>';
+}
+
+/** Cópia da tabela com estilos inline (Gmail/Outlook descartam o <style> da página). */
+function tabelaParaEmail(tabela){
+  const css = {
+    table: 'border-collapse:collapse;font-family:Times New Roman,serif;font-size:12px',
+    th: 'border:1px solid #999;padding:3px 6px;font-weight:bold;text-align:center;background:#fff;color:#000',
+    td: 'border:1px solid #999;padding:3px 6px;text-align:right',
+  };
+  const clone = tabela.cloneNode(true);
+  clone.removeAttribute('id'); clone.removeAttribute('class');
+  clone.setAttribute('style', css.table);
+  clone.querySelectorAll('th').forEach(e => { e.removeAttribute('class'); e.setAttribute('style', css.th); });
+  clone.querySelectorAll('tr').forEach(tr => {
+    const vermelho = tr.classList.contains('atraso'), negrito = tr.classList.contains('total');
+    tr.querySelectorAll('td').forEach(td => td.setAttribute('style', css.td
+      + (td.classList.contains('txt') ? ';text-align:left' : '')
+      + (vermelho ? ';color:#ff0000' : ';color:#000')
+      + (negrito ? ';font-weight:bold;border-top:2px solid #000' : '')));
+    tr.removeAttribute('class');
+    tr.querySelectorAll('td').forEach(td => td.removeAttribute('class'));
+  });
+  return clone.outerHTML;
+}
+
+/** Tabela como texto separado por tab (colar no Excel). */
+const tabelaParaTexto = tabela => [...tabela.querySelectorAll('tr')]
+  .map(tr => [...tr.children].map(c => c.innerText.replace(/\n/g, ' ')).join('\t')).join('\n');
+
+/**
+ * Copia HTML + texto para a área de transferência. O iframe do Apps Script pode bloquear a
+ * Clipboard API; nesse caso, seleciona um bloco escondido e usa execCommand('copy').
+ * Devolve true se copiou.
+ */
+async function copiarRico(html, texto){
+  try {
+    await navigator.clipboard.write([new ClipboardItem({
+      'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([texto], { type: 'text/plain' }) })]);
+    return true;
+  } catch (e) { /* segue para o plano B */ }
+  return copiarSelecao(html);
+}
+
+/**
+ * Cópia síncrona: seleciona um bloco escondido com o HTML e usa execCommand('copy').
+ * Use quando for abrir outra aba logo em seguida — a Clipboard API falha se a página perder o foco.
+ */
+function copiarSelecao(html){
+  const area = document.createElement('div');
+  area.contentEditable = 'true'; area.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff;color:#000';
+  area.innerHTML = html; document.body.appendChild(area);
+  const sel = getSelection(), range = document.createRange();
+  range.selectNodeContents(area); sel.removeAllRanges(); sel.addRange(range);
+  let copiou = false;
+  try { copiou = document.execCommand('copy'); } catch (e) { /* navegador sem suporte */ }
+  sel.removeAllRanges(); area.remove();
+  return copiou;
+}
+</script>

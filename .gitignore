@@ -25,3 +25,6 @@ Thumbs.db
 
 # Copias locais de seguranca (a versao fica na tag do git)
 backups/
+
+# Dados locais do dev_server.py (contem nomes de pessoas)
+apps_script/.dev/

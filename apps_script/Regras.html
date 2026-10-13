@@ -1,0 +1,106 @@
+<script>
+// ═════════════════════════════════════════════════════════════════════════════
+// Regras.html — regras de negócio e helpers comuns ao painel gerencial (Index.html)
+// e ao relatório de controle (Diretoria.html). Incluído via include('Regras').
+// Mudou uma regra? Mude aqui: as duas páginas passam a usar a mesma.
+// Cada página declara `let D` (os dados) antes de chamar estas funções.
+// ═════════════════════════════════════════════════════════════════════════════
+
+// Formato da linha de ticket: ver codificar_() no Code.gs
+const I = {TID:0, SUBJ:1, ST:2, AB:3, RESP:4, ULT:5, TPROC:6, TRESP:7, NMSG:8, NTROCAS:9, AN:10, CONS:11, ESC:12,
+           FILA:13, TR_DT:14, TR_DE:15, TR_PARA:16, TR_AREA_DE:17, TR_AREA_PARA:18, TR_TIPO:19};
+const VERSAO_DADOS = 3;   // igual ao Code.gs
+const FILA_BO = 1, FILA_CONS = 2, FILA_TRANSF = 3;   // Code.gs: FILA (calculada no servidor, com segundos)
+const SEM_DEPTO = 'Sem Departamento';
+const SEM_TRANSF = 'Sem transferência';
+const MES_PT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+// ── Formatação ─────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString('pt-BR');
+const pct = (a, b) => b ? (a / b * 100).toFixed(1).replace('.', ',') + '%' : '–';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const media = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+function mediana(arr){
+  if (!arr.length) return null;
+  const s = arr.slice().sort((a, b) => a - b), m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+/** 459.2 -> "19d 3h" · 5.25 -> "5h 15min" · 0.4 -> "24min" */
+function fmtH(h){
+  if (h == null || isNaN(h)) return '–';
+  if (h < 1) return Math.round(h * 60) + 'min';
+  if (h < 24){ const m = Math.round((h % 1) * 60); return Math.floor(h) + 'h' + (m ? ' ' + m + 'min' : ''); }
+  const hr = Math.round(h); return Math.floor(hr / 24) + 'd ' + (hr % 24) + 'h';
+}
+const fmtData = s => s ? `${s.slice(8,10)}/${s.slice(5,7)}/${s.slice(0,4)} ${s.slice(11)}` : '–';
+const fmtDia = s => s ? `${s.slice(8,10)}/${s.slice(5,7)}/${s.slice(0,4)}` : '';
+/** Horas entre duas datas "yyyy-MM-dd HH:mm" (mesmo fuso). */
+const horasEntre = (a, b) => (Date.parse(b.replace(' ', 'T') + ':00Z') - Date.parse(a.replace(' ', 'T') + ':00Z')) / 3600000;
+
+// ── Campos derivados do ticket ─────────────────────────────────────────────
+const statusKey = t => D.statusOrdem[t[I.ST]] || '';
+const fechado = t => statusKey(t) === 'closed';
+const deptOf = t => t[I.SUBJ] >= 0 ? D.departamentos[D.deptPorAssunto[t[I.SUBJ]]] : SEM_DEPTO;
+const transferido = t => t.length > I.TR_DT;
+const tipoTransf = t => transferido(t) ? (D.tiposTransf[t[I.TR_TIPO]] || 'Transferido') : SEM_TRANSF;
+
+// ── Dias úteis ─────────────────────────────────────────────────────────────
+// Feriados nacionais (lei federal). Carnaval e Corpus Christi são ponto facultativo: não entram.
+const FERIADOS_FIXOS = ['01-01', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', '11-20', '12-25'];
+const _feriados = {};
+function feriados(ano){
+  if (_feriados[ano]) return _feriados[ano];
+  // Páscoa (algoritmo de Meeus/Jones/Butcher) -> Sexta-feira Santa = Páscoa - 2 dias
+  const a = ano % 19, b = Math.floor(ano / 100), c = ano % 100, d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mes = Math.floor((h + l - 7 * m + 114) / 31), dia = ((h + l - 7 * m + 114) % 31) + 1;
+  const sexta = new Date(Date.UTC(ano, mes - 1, dia - 2)).toISOString().slice(0, 10);
+  return _feriados[ano] = new Set([...FERIADOS_FIXOS.map(md => `${ano}-${md}`), sexta]);
+}
+function diaUtil(iso){
+  const wd = new Date(iso + 'T00:00:00Z').getUTCDay();
+  return wd !== 0 && wd !== 6 && !feriados(+iso.slice(0, 4)).has(iso);
+}
+/** Prazo de 1 dia útil: mesmo horário no próximo dia útil ("2026-10-09 15:00" sexta -> "2026-10-13 15:00", pula o feriado de 12/10). */
+function prazoUtil(ref){
+  const d = new Date(ref.slice(0, 10) + 'T00:00:00Z');
+  do { d.setUTCDate(d.getUTCDate() + 1); } while (!diaUtil(d.toISOString().slice(0, 10)));
+  return d.toISOString().slice(0, 10) + ref.slice(10);
+}
+
+// ── Com quem está e SLA ────────────────────────────────────────────────────
+// Aguardando BO quando (a) foi transferido de assunto depois da última mensagem — o novo
+// departamento ainda não respondeu, prazo conta da transferência — ou (b) a última mensagem
+// é do consultor. SLA: 1 dia útil a partir dessa referência (nunca horas corridas).
+const _ref = new WeakMap();
+/** {motivo: 'transferencia' | 'resposta', ref: 'yyyy-MM-dd HH:mm', atrasado: bool} ou null */
+function refBO(t){
+  if (_ref.has(t)) return _ref.get(t);
+  let r = null;
+  if (!fechado(t)){
+    if (t[I.FILA] === FILA_TRANSF) r = { motivo: 'transferencia', ref: t[I.TR_DT] };
+    else if (t[I.FILA] === FILA_BO) r = { motivo: 'resposta', ref: t[I.ULT] || t[I.AB] };
+    if (r) r.atrasado = D.geradoEm > prazoUtil(r.ref);
+  }
+  _ref.set(t, r);
+  return r;
+}
+const aguardandoBO = t => !!refBO(t);
+const aguardandoCons = t => !fechado(t) && !refBO(t);
+/** SLA estourado (1 dia útil). */
+const alerta = t => !!(refBO(t) && refBO(t).atrasado);
+/** 'resposta' | 'transferencia' | null */
+const motivoAtraso = t => alerta(t) ? refBO(t).motivo : null;
+/** Horas esperando: desde a referência do BO, ou desde a última mensagem quando a vez é do consultor. */
+const esperaH = t => { const r = refBO(t), ref = r ? r.ref : t[I.ULT]; return ref ? horasEntre(ref, D.geradoEm) : (t[I.TPROC] || 0); };
+const SLA_TEXTO = '1 dia útil';
+
+/** gzip + base64 (como salvo pelo Code.gs) -> objeto. Descompacta no navegador. */
+async function descompactar(b64){
+  const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return JSON.parse(await new Response(stream).text());
+}
+</script>

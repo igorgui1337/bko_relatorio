@@ -297,13 +297,15 @@
       <div class="grid">
         <div class="card wide">
           <div class="card-head"><h3>Tickets aguardando o BO</h3><select class="limite" data-k="topEspera" title="Quantos itens mostrar"><option value="10">10 primeiros</option><option value="25">25 primeiros</option><option value="50">50 primeiros</option><option value="0">Todos</option></select></div>
-          <div class="card-sub">ordenados pelo tempo desde a última mensagem do consultor · vermelho = acima do SLA</div>
+          <div class="card-sub">ordenados pelo tempo de espera · vermelho = fora do SLA de 1 dia útil</div>
           <div class="info-box">
-            ⓘ <b>O que é esta lista:</b> tickets não fechados em que a <b>última mensagem foi do consultor</b>,
-            ou seja, <b>a vez de responder é do BackOffice</b>.
+            ⓘ <b>O que é esta lista:</b> tickets não fechados em que <b>a vez de responder é do BackOffice</b>:
+            a <b>última mensagem foi do consultor</b>, ou o ticket foi <b>transferido de assunto</b> depois da última mensagem
+            (o novo departamento ainda não respondeu).
             <ul>
-              <li><b>Tempo à direita:</b> há quanto tempo o BO está devendo resposta, contado desde a última mensagem do consultor (e não desde a abertura).</li>
-              <li><span class="sw" style="background:var(--danger)"></span><b>Vermelho:</b> esperando há mais de <span class="sla-h">24</span>h (fora do SLA) ·
+              <li><b>Tempo à direita:</b> há quanto tempo o BO está devendo resposta, contado desde a última mensagem do consultor ou desde a transferência (e não desde a abertura).</li>
+              <li><span class="sw" style="background:var(--danger)"></span><b>Vermelho:</b> passou de <b>1 dia útil</b> (fora do SLA). Fins de semana e feriados nacionais não contam:
+                  uma mensagem de sexta às 15h vence na segunda às 15h ·
                   <span class="sw" style="background:var(--accent)"></span><b>Laranja:</b> dentro do SLA.</li>
               <li><b>Fica de fora:</b> tickets em que o BO já respondeu e aguarda o consultor. Esses aparecem em “Aguardando consultor” e não contam no SLA.</li>
             </ul>
@@ -412,59 +414,23 @@
   </main>
 </div>
 
+<?!= include('Regras') ?>
 <script>
 // ═════════════════════════════════════════════════════════════════════════════
 // Dados gerados pelo Code.gs (atualizarDados), carregados por getDados() depois
-// que a página abre. Formato da linha de ticket: ver codificar_() no Code.gs.
+// que a página abre. Formato da linha e regras de negócio: Regras.html.
 // ═════════════════════════════════════════════════════════════════════════════
 let D = null;
 
-const I = {TID:0, SUBJ:1, ST:2, AB:3, RESP:4, ULT:5, TPROC:6, TRESP:7, NMSG:8, NTROCAS:9, AN:10, CONS:11, ESC:12,
-           FILA:13, TR_DT:14, TR_DE:15, TR_PARA:16, TR_AREA_DE:17, TR_AREA_PARA:18, TR_TIPO:19};
-// Com quem está o ticket não fechado (Code.gs: FILA), pela última mensagem
-const VERSAO_DADOS = 2;   // igual ao Code.gs
-const FILA_BO = 1, FILA_CONS = 2;
 const FILA_LABEL = {[FILA_BO]:'Aguardando BO', [FILA_CONS]:'Aguardando consultor'};
 const FILA_COR = {[FILA_BO]:'var(--danger)', [FILA_CONS]:'var(--st-pending)'};
-const SEM_TRANSF = 'Sem transferência';
 const TIPO_COR = {'Outra área':'var(--accent)', 'Mesma área':'var(--brand-3)', [SEM_TRANSF]:'var(--c6)'};
 const ST_LABEL = {open:'Aberto', processing:'Em processo', pending:'Pendente', closed:'Fechado'};
 const ST_COR   = {open:'var(--st-open)', processing:'var(--st-process)', pending:'var(--st-pending)', closed:'var(--st-closed)'};
 const PALETA   = ['var(--c1)','var(--c2)','var(--c3)','var(--c4)','var(--c5)','var(--c6)'];
-const SEM_DEPTO = 'Sem Departamento';
-const MES_PT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+/** Com quem está pela regra do Regras.html (inclui transferência): FILA_BO, FILA_CONS ou 0 (fechado). */
+const filaDe = t => aguardandoBO(t) ? FILA_BO : aguardandoCons(t) ? FILA_CONS : 0;
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-const $ = id => document.getElementById(id);
-const fmt = n => n.toLocaleString('pt-BR');
-const pct = (a, b) => b ? (a / b * 100).toFixed(1).replace('.', ',') + '%' : '–';
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const media = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
-function mediana(arr){
-  if (!arr.length) return null;
-  const s = arr.slice().sort((a, b) => a - b), m = s.length >> 1;
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
-}
-/** 459.2 -> "19d 3h" · 5.25 -> "5h 15min" · 0.4 -> "24min" (mesma ideia do _fmt_h do Streamlit) */
-function fmtH(h){
-  if (h == null || isNaN(h)) return '–';
-  if (h < 1) return Math.round(h * 60) + 'min';
-  if (h < 24){ const m = Math.round((h % 1) * 60); return Math.floor(h) + 'h' + (m ? ' ' + m + 'min' : ''); }
-  const hr = Math.round(h); return Math.floor(hr / 24) + 'd ' + (hr % 24) + 'h';
-}
-const fmtData = s => s ? `${s.slice(8,10)}/${s.slice(5,7)}/${s.slice(0,4)} ${s.slice(11)}` : '–';
-const statusKey = t => D.statusOrdem[t[I.ST]] || '';
-const deptOf = t => t[I.SUBJ] >= 0 ? D.departamentos[D.deptPorAssunto[t[I.SUBJ]]] : SEM_DEPTO;
-const aguardandoBO = t => t[I.FILA] === FILA_BO;
-const aguardandoCons = t => t[I.FILA] === FILA_CONS;
-/** Horas desde a última mensagem até a atualização dos dados. */
-const esperaH = t => t[I.ULT] ? horasEntre(t[I.ULT], D.geradoEm) : (t[I.TPROC] || 0);
-/** SLA só conta quando a vez é do BO, a partir da última mensagem do consultor. */
-const alerta = t => aguardandoBO(t) && esperaH(t) > D.slaH;
-const transferido = t => t.length > I.TR_DT;
-const tipoTransf = t => transferido(t) ? (D.tiposTransf[t[I.TR_TIPO]] || 'Transferido') : SEM_TRANSF;
-/** Horas entre duas datas "yyyy-MM-dd HH:mm" (mesmo fuso). */
-const horasEntre = (a, b) => (Date.parse(b.replace(' ', 'T') + ':00Z') - Date.parse(a.replace(' ', 'T') + ':00Z')) / 3600000;
 function corDe(nome){ let h = 0; for (const c of nome) h = (h * 31 + c.charCodeAt(0)) >>> 0; return PALETA[h % PALETA.length]; }
 function iniciais(nome){ const p = nome.trim().split(/\s+/); return ((p[0]||'')[0] + ((p[1]||'')[0] || '')).toUpperCase(); }
 
@@ -519,7 +485,7 @@ function filtrados(){
     if (state.esc !== '' && String(t[I.ESC]) !== state.esc) continue;
     if (state.an !== '' && String(t[I.AN]) !== state.an) continue;
     if (state.transf.size && !state.transf.has(tipoTransf(t))) continue;
-    if (state.fila.size && !state.fila.has(t[I.FILA])) continue;
+    if (state.fila.size && !state.fila.has(filaDe(t))) continue;
     out.push(t);
   }
   return out;
@@ -572,7 +538,7 @@ function renderGeral(L){
   $('kBO').textContent = fmt(a.aguardBO);
   $('kCons').textContent = fmt(a.aguardCons);
   $('kAlerta').textContent = fmt(a.alerta);
-  $('kAlertaSub').textContent = `aguardando BO há mais de ${D.slaH}h`;
+  $('kAlertaSub').textContent = `aguardando BO há mais de ${SLA_TEXTO}`;
 
   // Funil empilhado por status
   const g = granEfetiva(), buckets = listaBuckets(g);
@@ -629,8 +595,7 @@ function renderSla(L){
   const comAlerta = espera.filter(alerta).length;
   const cons = L.filter(aguardandoCons);
   $('sEspera').textContent = fmt(espera.length);
-  $('sAlertaLbl').textContent = `Acima de ${D.slaH}h`;
-  document.querySelectorAll('.sla-h').forEach(e => e.textContent = D.slaH);
+  $('sAlertaLbl').textContent = `Fora do SLA (${SLA_TEXTO})`;
   $('sAlerta').textContent = fmt(comAlerta);
   $('sAlertaSub').textContent = `${pct(comAlerta, espera.length)} dos aguardando BO`;
   $('sMaior').textContent = espera.length ? fmtH(esperaH(espera[0])) : '–';
@@ -786,7 +751,7 @@ function renderTickets(L){
     ['Ticket', 'Assunto', 'Status', 'Com quem', 'Abertura', 'Tempo em processo', '1ª resposta BO', 'Msgs', 'Trocas de resp.', 'Transferência', 'Analista', 'Consultor', 'Escritório', 'Departamento'],
     limitar('tblTickets', lista).map(t => ({ cells: [
       '#' + t[I.TID], { txt: D.assuntos[t[I.SUBJ]] }, { html: badge(statusKey(t)) },
-      { html: FILA_LABEL[t[I.FILA]] ? `<span class="${alerta(t) ? 'alert-txt' : ''}">${FILA_LABEL[t[I.FILA]]} há ${fmtH(esperaH(t))}</span>` : '–' },
+      { html: FILA_LABEL[filaDe(t)] ? `<span class="${alerta(t) ? 'alert-txt' : ''}">${FILA_LABEL[filaDe(t)]}${aguardandoBO(t) && refBO(t).motivo === 'transferencia' ? ' (transferência)' : ''} há ${fmtH(esperaH(t))}</span>` : '–' },
       fmtData(t[I.AB]), fmtH(t[I.TPROC]), fmtH(t[I.TRESP]),
       fmt(t[I.NMSG]), fmt(t[I.NTROCAS]),
       { txt: transferido(t) ? `${tipoTransf(t)} · ${D.assuntos[t[I.TR_DE]] || '?'} → ${D.assuntos[t[I.TR_PARA]] || '?'}` : '' },
@@ -946,7 +911,8 @@ function init(){
   if (!D || !D.t || !D.t.length){ $('semDados').style.display = ''; document.querySelectorAll('.view').forEach(v => v.classList.remove('on')); return; }
 
   const dias = D.t.map(t => t[I.AB].slice(0, 10)).filter(Boolean).sort();
-  MIN_DIA = dias[0]; MAX_DIA = D.geradoEm.slice(0, 10) > dias[dias.length - 1] ? D.geradoEm.slice(0, 10) : dias[dias.length - 1];
+  // Tickets antes de D.inicio são só atrasos antigos trazidos pelo histórico: ficam fora do período padrão
+  MIN_DIA = D.inicio && D.inicio > dias[0] ? D.inicio : dias[0]; MAX_DIA = D.geradoEm.slice(0, 10) > dias[dias.length - 1] ? D.geradoEm.slice(0, 10) : dias[dias.length - 1];
   state.from = MIN_DIA; state.to = MAX_DIA;
   $('updated').textContent = `Atualizado em ${fmtData(D.geradoEm)}`;
 
@@ -1011,13 +977,6 @@ function init(){
   const btn = aba && document.querySelector(`#tabs button[data-tab="${aba}"]`);
   if (btn) btn.click(); else render();
 }
-/** gzip + base64 (como salvo pelo Code.gs) -> objeto. Descompacta no navegador. */
-async function descompactar(b64){
-  const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
-  return JSON.parse(await new Response(stream).text());
-}
-
 function falhaCarga(msg){
   $('carregando').textContent = 'Não foi possível carregar os dados: ' + msg;
 }

@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<base target="_top">
+<meta charset="utf-8"/>
+<title>Painel de Tickets · Tempo real</title>
+<style>
+  /* Paleta W1 (mesmos tokens do Index.html); segue o tema claro/escuro do sistema */
+  :root{
+    --bg:#f4f7f6; --surface:#ffffff; --surface-2:#eef3f2;
+    --ink:#0c2b2b; --muted:#5a6b6a; --border:#dbe4e3;
+    --brand:#0b494b; --brand-2:#0f6d70; --brand-3:#13908f; --brand-4:#2bb3b0;
+    --accent:#e8a33d; --accent-soft:rgba(232,163,61,.14); --on-brand:#ffffff;
+    --ok:#0b7a5b; --danger:#c0442e; --st-closed:#0b7a5b;
+    --shadow-sm:0 1px 2px rgba(11,73,75,.05);
+    --font:'Segoe UI',-apple-system,Roboto,Helvetica,Arial,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#071615; --surface:#0e211f; --surface-2:#122a28;
+      --ink:#e7efee; --muted:#9bb0ae; --border:#1d3a37;
+      --brand:#2bb3b0; --brand-2:#38c0bd; --brand-3:#17a3a1; --brand-4:#5fd0cd;
+      --accent:#f0b45a; --accent-soft:rgba(240,180,90,.14); --on-brand:#04211f;
+      --ok:#3fc79a; --danger:#e8735b; --st-closed:#3fc79a;
+      --shadow-sm:0 1px 2px rgba(0,0,0,.35);
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13.5px/1.5 var(--font)}
+  .pagina{max-width:1280px;margin:0 auto;padding:18px 22px 32px}
+  @media (max-width:600px){ .pagina{padding:14px 16px 24px} }
+
+  /* ─── Cabeçalho ─── */
+  .topo{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+  .brand-dot{width:38px;height:38px;border-radius:9px;background:var(--brand);flex:none;
+    display:flex;align-items:center;justify-content:center;color:var(--on-brand);font-weight:900;font-size:14px}
+  .topo h1{margin:0;font-size:20px;color:var(--brand);font-weight:800;line-height:1.2}
+  .atualizacao{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:2px}
+  .pulso{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 25%,transparent)}
+  .pulso.velho{background:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  .acoes{display:flex;gap:8px;margin-left:auto;align-items:center;flex-wrap:wrap}
+  .btn{padding:8px 13px;font-size:12px;font-weight:700;border-radius:7px;border:1px solid var(--brand);cursor:pointer;
+    font-family:var(--font);background:var(--brand);color:var(--on-brand);text-decoration:none;display:inline-block}
+  .btn:hover{background:var(--brand-2)}
+  .btn.ghost{background:transparent;color:var(--brand)}
+  .btn.ghost:hover{background:var(--surface-2)}
+  .btn:disabled{opacity:.4;cursor:default}
+
+  /* ─── Período ─── */
+  .periodo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);
+    border-radius:10px;padding:8px 10px;margin-bottom:14px}
+  .periodo .rotulo{font-weight:800;color:var(--ink);font-size:14px;min-width:220px;text-align:center}
+  .periodo .seta{padding:5px 10px}
+  .periodo .sep{width:1px;height:22px;background:var(--border);margin:0 4px}
+  .periodo label{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  input[type="date"]{padding:5px 7px;font-size:12px;font-family:var(--font);background:var(--surface);color:var(--ink);
+    border:1px solid var(--border);border-radius:6px}
+
+  /* ─── Cartões ─── */
+  .secao{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:0 0 6px}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:12px 15px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden}
+  .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--brand-3)}
+  .kpi.ok::before{background:var(--ok)} .kpi.warn::before{background:var(--accent)} .kpi.bad::before{background:var(--danger)}
+  .kpi-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+  .kpi-value{font-size:27px;font-weight:800;color:var(--brand);margin-top:2px;font-variant-numeric:tabular-nums}
+  .kpi.bad .kpi-value{color:var(--danger)}
+  .kpi-sub{font-size:11px;color:var(--muted)}
+
+  .grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:12px;margin-bottom:12px}
+  @media (max-width:1000px){ .grid{grid-template-columns:minmax(0,1fr)} }
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:13px 15px 14px;box-shadow:var(--shadow-sm);min-width:0}
+  .card h3{margin:0 0 2px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  .card .card-sub{font-size:11px;color:var(--muted);margin-bottom:8px}
+
+  svg{display:block;max-width:100%}
+  .axis{fill:var(--muted);font-size:10px;font-family:var(--font)}
+  .gridline{stroke:var(--border);stroke-width:1}
+  .legend{display:flex;gap:12px;font-size:11px;color:var(--muted);margin-bottom:6px;flex-wrap:wrap}
+  .legend .lg{display:inline-flex;align-items:center;gap:5px}
+  .legend .sw{width:10px;height:10px;border-radius:2px}
+
+  .tbl-wrap{overflow-x:auto}
+  table.dados{width:100%;border-collapse:collapse;font-size:12.5px}
+  table.dados th, table.dados td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;font-variant-numeric:tabular-nums}
+  table.dados th:first-child, table.dados td:first-child{text-align:left}
+  table.dados thead th{color:var(--muted);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;background:var(--surface-2)}
+  table.dados tr.total td{font-weight:800;border-top:2px solid var(--border)}
+  .alert-txt{color:var(--danger);font-weight:700}
+  td.txt{text-align:left !important;max-width:280px;overflow:hidden;text-overflow:ellipsis}
+
+  .atraso-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:6px 2px;border-bottom:1px solid var(--border);font-size:12px}
+  .atraso-row:last-child{border-bottom:0}
+  .atraso-row .tit{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .atraso-row .tempo{font-weight:800;color:var(--danger);font-variant-numeric:tabular-nums}
+  .atraso-row .det{grid-column:1/-1;color:var(--muted);font-size:11px}
+  .tag{display:inline-block;font-size:10px;font-weight:800;border-radius:4px;padding:0 5px;margin-right:4px}
+  .tag.resp{background:color-mix(in srgb,var(--danger) 14%,transparent);color:var(--danger)}
+  .tag.transf{background:var(--accent-soft);color:color-mix(in srgb,var(--accent) 70%,var(--ink))}
+
+  .rodape{font-size:11px;color:var(--muted);margin-top:6px;display:flex;gap:12px;flex-wrap:wrap;justify-content:space-between}
+  .rodape a{color:var(--brand-2);font-weight:700}
+  .aviso{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:22px;text-align:center;color:var(--muted);font-style:italic}
+  .faixa{background:var(--accent-soft);border-left:3px solid var(--accent);border-radius:6px;padding:9px 12px;margin-bottom:12px;font-size:12.5px}
+
+  /* ─── Relatório (prévia) ─── */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-start;justify-content:center;padding:24px 12px;z-index:10;overflow:auto}
+  .modal.on{display:flex}
+  .modal-caixa{background:var(--surface);color:var(--ink);border-radius:12px;max-width:1100px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+  .modal-topo{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--border)}
+  .modal-topo h2{margin:0;font-size:15px;color:var(--brand)}
+  .modal-topo .acoes{margin-left:auto}
+  .modal-info{font-size:11.5px;color:var(--muted);padding:8px 16px 0}
+  .previa{background:#fff;color:#000;margin:12px 16px 16px;border:1px solid var(--border);border-radius:8px;padding:16px;overflow:auto;max-height:65vh}
+</style>
+</head>
+<body>
+<div class="pagina">
+  <header class="topo">
+    <div class="brand-dot">W1</div>
+    <div>
+      <h1>Painel de Tickets · Tempo real</h1>
+      <div class="atualizacao"><span class="pulso" id="pulso"></span><span id="ultima">Carregando dados…</span></div>
+    </div>
+    <div class="acoes">
+      <button class="btn" id="btnRelatorio" disabled>Gerar relatório semanal</button>
+      <a class="btn ghost" href="<?= urlGerencial ?>" title="Painel completo com todos os detalhes">Ver painel completo →</a>
+    </div>
+  </header>
+
+  <div class="faixa" id="faixa" style="display:none"></div>
+  <div id="aviso" class="aviso" style="display:none"></div>
+
+  <div id="conteudo" style="display:none">
+    <div class="periodo">
+      <button class="btn ghost seta" id="btnAnt" title="Semana anterior">◀</button>
+      <span class="rotulo" id="rotuloPeriodo"></span>
+      <button class="btn ghost seta" id="btnProx" title="Próxima semana">▶</button>
+      <button class="btn ghost" id="btnAtual">Semana atual</button>
+      <span class="sep"></span>
+      <label for="fDe">De</label><input type="date" id="fDe"/>
+      <label for="fAte">até</label><input type="date" id="fAte"/>
+      <button class="btn ghost" id="btnAplicar">Buscar</button>
+    </div>
+
+    <div class="secao" id="secPeriodo">No período</div>
+    <div class="kpis">
+      <div class="kpi"><div class="kpi-label">Abertos</div><div class="kpi-value" id="kAbertos">–</div><div class="kpi-sub" id="kAbertosSub"></div></div>
+      <div class="kpi ok"><div class="kpi-label">Fechados</div><div class="kpi-value" id="kFech">–</div><div class="kpi-sub" id="kFechSub"></div></div>
+      <div class="kpi"><div class="kpi-label">1ª resposta (mediana)</div><div class="kpi-value" id="kResp">–</div><div class="kpi-sub">da abertura à 1ª resposta do BO</div></div>
+      <div class="kpi warn"><div class="kpi-label">Transferidos</div><div class="kpi-value" id="kTransf">–</div><div class="kpi-sub" id="kTransfSub"></div></div>
+    </div>
+
+    <div class="secao">Agora · tickets de qualquer mês aguardando o BackOffice</div>
+    <div class="kpis">
+      <div class="kpi warn"><div class="kpi-label">Aguardando BO</div><div class="kpi-value" id="kBO">–</div><div class="kpi-sub">vez do BackOffice responder</div></div>
+      <div class="kpi ok"><div class="kpi-label">Em dia</div><div class="kpi-value" id="kDia">–</div><div class="kpi-sub">dentro de 1 dia útil</div></div>
+      <div class="kpi bad"><div class="kpi-label">Atraso · sem resposta</div><div class="kpi-value" id="kAtrResp">–</div><div class="kpi-sub">consultor sem retorno há mais de 1 dia útil</div></div>
+      <div class="kpi bad"><div class="kpi-label">Atraso · transferência</div><div class="kpi-value" id="kAtrTransf">–</div><div class="kpi-sub">sem retorno após a transferência</div></div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Por dia</h3>
+        <div class="card-sub">tickets abertos em cada dia do período, pelo status atual</div>
+        <div class="legend"><span class="lg"><span class="sw" style="background:var(--st-closed)"></span>Fechados</span><span class="lg"><span class="sw" style="background:var(--accent)"></span>Ainda não fechados</span></div>
+        <div id="grafDia"></div>
+      </div>
+      <div class="card">
+        <h3>Atrasos agora</h3>
+        <div class="card-sub">10 tickets esperando o BO há mais tempo · SLA de 1 dia útil</div>
+        <div id="listaAtrasos"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Por departamento</h3>
+      <div class="card-sub">abertos e 1ª resposta no período · em dia e atrasos de agora</div>
+      <div class="tbl-wrap"><table class="dados" id="tblDepto"></table></div>
+    </div>
+
+    <div class="rodape">
+      <span>SLA de 1 dia útil: vence no mesmo horário do próximo dia útil (fins de semana e feriados nacionais não contam).</span>
+      <span>Detalhes por ticket, analista e escritório no <a href="<?= urlGerencial ?>">painel completo</a></span>
+    </div>
+  </div>
+</div>
+
+<!-- Prévia do relatório semanal -->
+<div class="modal" id="modal">
+  <div class="modal-caixa">
+    <div class="modal-topo">
+      <h2>Relatório semanal</h2>
+      <div class="acoes">
+        <button class="btn" id="btnEnviar">Copiar e abrir e-mail</button>
+        <button class="btn ghost" id="btnFechar">Fechar</button>
+      </div>
+    </div>
+    <div class="modal-info" id="modalInfo"></div>
+    <div class="previa" id="previa"></div>
+  </div>
+</div>
+
+<?!= include('Regras') ?>
+<?!= include('Relatorio') ?>
+<script>
+// ═════════════════════════════════════════════════════════════════════════════
+// Painel de tempo real — semana vigente (seg–dom), busca nos últimos 30 dias,
+// relatório semanal por e-mail. Regras: Regras.html · tabela Titan: Relatorio.html.
+// ═════════════════════════════════════════════════════════════════════════════
+let D = null;
+let CONFIG = { destinatarios: '', assunto: 'Relatório semanal de tickets · BackOffice · {semana}', urlPlanilha: '' };
+const DIAS_BUSCA = 30;               // busca personalizada: últimos 30 dias
+const RECARREGAR_MS = 10 * 60000;    // com a página aberta, busca dados novos a cada 10 min
+const DIA_SEM = ['dom','seg','ter','qua','qui','sex','sáb'];
+const URL_COMPLETO = '<?= urlGerencial ?>';
+const periodo = { de: '', ate: '', semana: true };
+
+// ── Datas (strings yyyy-MM-dd, sem fuso) ───────────────────────────────────
+const somaDias = (iso, n) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const segunda = iso => { const d = new Date(iso + 'T00:00:00Z'); return somaDias(iso, -((d.getUTCDay() + 6) % 7)); };
+const hoje = () => D.geradoEm.slice(0, 10);
+const limiteBusca = () => somaDias(hoje(), -(DIAS_BUSCA - 1));
+const diaCurto = iso => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+const diasDe = (de, ate) => { const out = []; for (let d = de; d <= ate; d = somaDias(d, 1)) out.push(d); return out; };
+const rotuloPeriodo = () => `${diaCurto(periodo.de)} a ${diaCurto(periodo.ate)}/${periodo.ate.slice(0, 4)}`;
+
+function irParaSemana(seg){ periodo.de = seg; periodo.ate = somaDias(seg, 6); periodo.semana = true; render(); }
+
+// ── Cálculos ───────────────────────────────────────────────────────────────
+const doPeriodo = () => D.t.filter(t => { const d = t[I.AB].slice(0, 10); return d >= periodo.de && d <= periodo.ate; });
+
+/** Números do período (pela abertura) + retrato de agora (qualquer mês). */
+function resumo(){
+  const L = doPeriodo(), T = L.filter(transferido);
+  const fech = L.filter(fechado).length;
+  const agora = { bo: 0, emDia: 0, atrResp: 0, atrTransf: 0 };
+  for (const t of D.t){
+    if (DEPTO_FORA.has(deptOf(t))) continue;
+    const r = refBO(t); if (!r) continue;
+    agora.bo++;
+    if (!r.atrasado) agora.emDia++; else if (r.motivo === 'transferencia') agora.atrTransf++; else agora.atrResp++;
+  }
+  return { L, abertos: L.length, fechados: fech, pctFech: L.length ? fech / L.length * 100 : null,
+           resp: mediana(L.map(t => t[I.TRESP]).filter(h => h != null)), transf: T.length, agora };
+}
+
+function porDepartamento(L){
+  const m = new Map();
+  const linha = d => { if (!m.has(d)) m.set(d, { d, ab: 0, fe: 0, resp: [], dia: 0, ar: 0, at: 0 }); return m.get(d); };
+  for (const t of L){ const r = linha(deptOf(t)); r.ab++; if (fechado(t)) r.fe++; if (t[I.TRESP] != null) r.resp.push(t[I.TRESP]); }
+  for (const t of D.t){
+    const b = refBO(t); if (!b) continue;
+    const r = linha(deptOf(t));
+    if (!b.atrasado) r.dia++; else if (b.motivo === 'transferencia') r.at++; else r.ar++;
+  }
+  return [...m.values()].filter(r => !DEPTO_FORA.has(r.d) && (r.ab || r.dia || r.ar || r.at))
+    .sort((a, b) => (b.ar + b.at) - (a.ar + a.at) || b.ab - a.ab || a.d.localeCompare(b.d, 'pt-BR'));
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function render(){
+  const ehAtual = periodo.semana && periodo.de === segunda(hoje());
+  $('rotuloPeriodo').textContent = (periodo.semana ? `Semana de ${rotuloPeriodo()}` : rotuloPeriodo()) + (ehAtual ? ' · atual' : '');
+  $('secPeriodo').textContent = `No período · tickets abertos de ${rotuloPeriodo()}`;
+  $('btnProx').disabled = !periodo.semana || periodo.ate >= hoje();
+  $('btnAnt').disabled = !periodo.semana || periodo.de <= limiteBusca();
+  $('fDe').value = periodo.de; $('fAte').value = periodo.ate;
+  $('fDe').min = $('fAte').min = limiteBusca(); $('fDe').max = $('fAte').max = hoje();
+
+  const r = resumo();
+  $('kAbertos').textContent = fmt(r.abertos);
+  $('kAbertosSub').textContent = `${diasDe(periodo.de, periodo.ate < hoje() ? periodo.ate : hoje()).length} dia(s) no período`;
+  $('kFech').textContent = fmt(r.fechados);
+  $('kFechSub').textContent = `${pct(r.fechados, r.abertos)} dos abertos`;
+  $('kResp').textContent = fmtH(r.resp);
+  $('kTransf').textContent = fmt(r.transf);
+  $('kTransfSub').textContent = `${pct(r.transf, r.abertos)} dos abertos`;
+  $('kBO').textContent = fmt(r.agora.bo);
+  $('kDia').textContent = fmt(r.agora.emDia);
+  $('kAtrResp').textContent = fmt(r.agora.atrResp);
+  $('kAtrTransf').textContent = fmt(r.agora.atrTransf);
+
+  // Por dia
+  const dias = diasDe(periodo.de, periodo.ate);
+  const cont = new Map(dias.map(d => [d, { f: 0, n: 0 }]));
+  for (const t of r.L){ const c = cont.get(t[I.AB].slice(0, 10)); if (c) fechado(t) ? c.f++ : c.n++; }
+  $('grafDia').innerHTML = graficoDias(dias, cont);
+
+  // Atrasos agora
+  const atrasados = D.t.filter(t => alerta(t) && !DEPTO_FORA.has(deptOf(t))).sort((a, b) => esperaH(b) - esperaH(a)).slice(0, 10);
+  $('listaAtrasos').innerHTML = atrasados.length ? atrasados.map(t => {
+    const mot = motivoAtraso(t);
+    return `<div class="atraso-row"><div class="tit">#${t[I.TID]} · ${esc(D.assuntos[t[I.SUBJ]] || '(sem assunto)')}</div>
+      <div class="tempo">${fmtH(esperaH(t))}</div>
+      <div class="det"><span class="tag ${mot === 'transferencia' ? 'transf' : 'resp'}">${mot === 'transferencia' ? 'TRANSFERÊNCIA' : 'SEM RESPOSTA'}</span>${esc(deptOf(t))} · desde ${fmtData(refBO(t).ref)}</div></div>`;
+  }).join('') : '<div class="aviso">Nenhum ticket em atraso agora</div>';
+
+  // Por departamento
+  const deps = porDepartamento(r.L);
+  const tot = deps.reduce((s, x) => ({ ab: s.ab + x.ab, fe: s.fe + x.fe, dia: s.dia + x.dia, ar: s.ar + x.ar, at: s.at + x.at }), { ab: 0, fe: 0, dia: 0, ar: 0, at: 0 });
+  const nz = v => v ? fmt(v) : '–';
+  $('tblDepto').innerHTML = `<thead><tr><th>Departamento</th><th>Abertos</th><th>Fechados</th><th>% fechados</th><th>1ª resposta</th><th>Em dia</th><th>Atraso · sem resposta</th><th>Atraso · transferência</th></tr></thead><tbody>`
+    + deps.map(x => `<tr><td class="txt">${esc(x.d)}</td><td>${nz(x.ab)}</td><td>${nz(x.fe)}</td><td>${x.ab ? pct(x.fe, x.ab) : '–'}</td><td>${fmtH(mediana(x.resp))}</td>
+        <td>${nz(x.dia)}</td><td class="${x.ar ? 'alert-txt' : ''}">${nz(x.ar)}</td><td class="${x.at ? 'alert-txt' : ''}">${nz(x.at)}</td></tr>`).join('')
+    + `<tr class="total"><td>Total</td><td>${fmt(tot.ab)}</td><td>${fmt(tot.fe)}</td><td>${pct(tot.fe, tot.ab)}</td><td>${fmtH(r.resp)}</td><td>${fmt(tot.dia)}</td><td>${fmt(tot.ar)}</td><td>${fmt(tot.at)}</td></tr></tbody>`;
+}
+
+/** Barras empilhadas por dia (fechados / ainda não fechados). */
+function graficoDias(dias, cont){
+  const W = 760, H = 220, pl = 40, pr = 8, pt = 16, pb = 34;
+  const n = dias.length, bw = (W - pl - pr) / n, ih = H - pt - pb;
+  const tot = dias.map(d => cont.get(d).f + cont.get(d).n);
+  let max = Math.max(1, ...tot);
+  const ordem = Math.pow(10, Math.floor(Math.log10(max)));
+  const step = ordem * ([1, 2, 5].find(m => max / (ordem * m) <= 5) || 10);
+  max = Math.ceil(max / step) * step;
+  const y = v => pt + ih - v / max * ih;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img">`;
+  for (let v = 0; v <= max; v += step) s += `<line class="gridline" x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}"/><text class="axis" x="${pl - 6}" y="${y(v) + 3}" text-anchor="end">${fmt(v)}</text>`;
+  const gap = Math.min(14, bw * 0.3), cada = Math.ceil(n / 16);
+  dias.forEach((d, i) => {
+    const x = pl + i * bw + gap / 2, w = Math.max(1, bw - gap), c = cont.get(d);
+    const futuro = d > hoje();
+    if (c.f) s += `<rect x="${x}" y="${y(c.f)}" width="${w}" height="${y(0) - y(c.f)}" rx="2" fill="var(--st-closed)"><title>${diaCurto(d)} · fechados: ${fmt(c.f)}</title></rect>`;
+    if (c.n) s += `<rect x="${x}" y="${y(c.f + c.n)}" width="${w}" height="${y(c.f) - y(c.f + c.n)}" rx="2" fill="var(--accent)"><title>${diaCurto(d)} · ainda não fechados: ${fmt(c.n)}</title></rect>`;
+    if (tot[i]) s += `<text class="axis" x="${x + w / 2}" y="${y(tot[i]) - 4}" text-anchor="middle" style="font-weight:700;fill:var(--ink)">${fmt(tot[i])}</text>`;
+    if (i % cada === 0){
+      const wd = DIA_SEM[new Date(d + 'T00:00:00Z').getUTCDay()];
+      s += `<text class="axis" x="${x + w / 2}" y="${H - pb + 14}" text-anchor="middle" style="${d === hoje() ? 'font-weight:800;fill:var(--ink)' : ''}${futuro ? ';opacity:.45' : ''}">${wd}</text>`
+        + `<text class="axis" x="${x + w / 2}" y="${H - pb + 26}" text-anchor="middle"${futuro ? ' style="opacity:.45"' : ''}>${diaCurto(d)}</text>`;
+    }
+  });
+  return s + '</svg>';
+}
+
+// ── Relatório semanal ──────────────────────────────────────────────────────
+let RELATORIO = null;   // { html, texto, resumo, assunto }
+
+function montarRelatorio(){
+  const r = resumo(), deps = porDepartamento(r.L);
+  const semana = rotuloPeriodo();
+  const st = {
+    p: 'font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#222;margin:0 0 10px',
+    h: 'font-family:Arial,Helvetica,sans-serif;font-size:16px;color:#0b494b;margin:0 0 4px',
+    h3: 'font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#0b494b;margin:16px 0 6px;text-transform:uppercase',
+    tab: 'border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:12px',
+    th: 'border:1px solid #999;padding:4px 8px;background:#eef3f2;font-weight:bold;text-align:center;color:#000',
+    td: 'border:1px solid #999;padding:4px 8px;text-align:right;color:#000',
+    tdl: 'border:1px solid #999;padding:4px 8px;text-align:left;color:#000',
+  };
+  const cel = (v, alerta) => `<td style="${st.td}${alerta ? ';color:#ff0000;font-weight:bold' : ''}">${v}</td>`;
+  const kpis = [
+    ['Abertos na semana', fmt(r.abertos)], ['Fechados', `${fmt(r.fechados)} (${pct(r.fechados, r.abertos)})`],
+    ['1ª resposta (mediana)', fmtH(r.resp)], ['Transferidos', fmt(r.transf)],
+    ['Aguardando BO agora', fmt(r.agora.bo)], ['Em atraso · sem resposta', fmt(r.agora.atrResp)], ['Em atraso · transferência', fmt(r.agora.atrTransf)],
+  ];
+  const tabKpis = `<table style="${st.tab}"><tr>${kpis.map(k => `<th style="${st.th}">${k[0]}</th>`).join('')}</tr>`
+    + `<tr>${kpis.map((k, i) => cel(k[1], i >= 5 && k[1] !== '0')).join('')}</tr></table>`;
+  const tabDep = `<table style="${st.tab}"><tr>${['Departamento', 'Abertos', 'Fechados', '% fechados', '1ª resposta', 'Em dia', 'Atraso · sem resposta', 'Atraso · transferência']
+      .map(h => `<th style="${st.th}">${h}</th>`).join('')}</tr>`
+    + deps.map(x => `<tr><td style="${st.tdl}">${esc(x.d)}</td>${cel(fmt(x.ab))}${cel(fmt(x.fe))}${cel(x.ab ? pct(x.fe, x.ab) : '–')}${cel(fmtH(mediana(x.resp)))}${cel(fmt(x.dia))}${cel(fmt(x.ar), x.ar)}${cel(fmt(x.at), x.at)}</tr>`).join('')
+    + '</table>';
+  // Tabela por assunto no formato do Titan (a mesma do relatório de atrasos)
+  const tmp = document.createElement('table');
+  tmp.innerHTML = tabelaTitan(montarLinhas());
+  const titan = tabelaParaEmail(tmp);
+
+  const html = `<div>
+    <p style="${st.h}"><b>Relatório semanal de tickets · BackOffice</b></p>
+    <p style="${st.p}">Semana de ${semana} · dados atualizados em ${fmtData(D.geradoEm).replace(' ', ' às ')} (Metabase).
+      SLA de 1 dia útil: vence no mesmo horário do próximo dia útil.</p>
+    <p style="${st.h3}"><b>Resumo da semana</b></p>${tabKpis}
+    <p style="${st.h3}"><b>Por departamento</b></p>${tabDep}
+    <p style="${st.h3}"><b>Situação por assunto</b></p>${titan}
+    <p style="${st.p};margin-top:14px">Detalhes por ticket, analista e escritório no <a href="${esc(URL_COMPLETO)}">painel completo</a>.</p>
+  </div>`;
+  const texto = [`Relatório semanal de tickets · BackOffice — semana de ${semana}`, ...kpis.map(k => `${k[0]}: ${k[1]}`),
+    `Painel completo: ${URL_COMPLETO}`].join('\n');
+  return {
+    html, texto, assunto: CONFIG.assunto.replace('{semana}', semana),
+    resumo: { inicio: periodo.de, fim: periodo.ate, abertos: r.abertos, fechados: r.fechados,
+              pctFechados: r.pctFech == null ? '' : Math.round(r.pctFech * 10) / 10,
+              respMedianaH: r.resp == null ? '' : Math.round(r.resp * 10) / 10, transferidos: r.transf,
+              aguardandoBO: r.agora.bo, atrasoResposta: r.agora.atrResp, atrasoTransferencia: r.agora.atrTransf },
+  };
+}
+
+function abrirRelatorio(){
+  RELATORIO = montarRelatorio();
+  $('previa').innerHTML = RELATORIO.html;
+  $('modalInfo').innerHTML = `Assunto: <b>${esc(RELATORIO.assunto)}</b> · Para: <b>${esc(CONFIG.destinatarios || '(defina RELATORIO_DESTINATARIOS nas propriedades do script)')}</b><br>
+    Ao clicar em <b>Copiar e abrir e-mail</b>, o relatório é copiado e um e-mail novo abre no Gmail: é só colar (Ctrl+V) no corpo e enviar.`;
+  $('modal').classList.add('on');
+}
+
+function enviarRelatorio(){
+  // Ordem importa, tudo dentro do clique: copiar primeiro (a cópia falha se a página perder o foco)
+  // e só então abrir o Gmail (pop-up aberto fora do clique é bloqueado).
+  const url = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(CONFIG.destinatarios) + '&su=' + encodeURIComponent(RELATORIO.assunto);
+  const copiou = copiarSelecao(RELATORIO.html);
+  const aba = window.open(url, '_blank');
+  $('modal').classList.remove('on');
+  $('faixa').innerHTML = (copiou ? '✓ <b>Relatório copiado.</b> Cole (Ctrl+V) no corpo do e-mail que abriu no Gmail.'
+                                 : '⚠ Não foi possível copiar automaticamente: abra o relatório de novo, selecione a prévia e use Ctrl+C.')
+    + (aba ? '' : ` Se o e-mail não abriu, <a href="${esc(url)}" target="_blank">clique aqui</a>.`);
+  $('faixa').style.display = '';
+  google.script.run
+    .withSuccessHandler(urlPlanilha => { CONFIG.urlPlanilha = urlPlanilha;
+      $('faixa').innerHTML += ` · Semana registrada no <a href="${esc(urlPlanilha)}" target="_blank">histórico semanal</a>.`; })
+    .withFailureHandler(e => { $('faixa').innerHTML += ' · Não foi possível registrar no histórico semanal: ' + esc(e.message || String(e)); })
+    .registrarSemana(RELATORIO.resumo);
+}
+
+// ── Atualização ────────────────────────────────────────────────────────────
+function mostrarUltima(){
+  if (!D) return;
+  const min = Math.round(horasEntre(D.geradoEm, agoraLocal()) * 60);
+  $('ultima').textContent = `Última atualização: ${fmtData(D.geradoEm).replace(' ', ' às ')}` + (min >= 1 ? ` (há ${min < 60 ? min + ' min' : fmtH(min / 60)})` : '');
+  $('pulso').classList.toggle('velho', min > 60);
+}
+/** Agora em "yyyy-MM-dd HH:mm" no horário de Brasília (UTC-3, como o Code.gs). */
+const agoraLocal = () => new Date(Date.now() - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ');
+
+function mostrarAviso(html){ $('aviso').innerHTML = html; $('aviso').style.display = ''; $('ultima').textContent = ''; }
+
+function carregar(primeira){
+  google.script.run
+    .withSuccessHandler(async b64 => {
+      let novo;
+      try { novo = b64 ? await descompactar(b64) : null; }
+      catch (e) { if (primeira) mostrarAviso('Não foi possível carregar os dados: ' + esc(e.message)); return; }
+      if (primeira) return init(novo);
+      if (novo && novo.versao === VERSAO_DADOS && novo.geradoEm !== D.geradoEm){ D = novo; render(); }
+      mostrarUltima();
+    })
+    .withFailureHandler(e => { if (primeira) mostrarAviso('Não foi possível carregar os dados: ' + esc(e.message || String(e))); })
+    .getDados();
+}
+
+function init(dados){
+  D = dados;
+  if (D && D.versao !== VERSAO_DADOS){ mostrarAviso('Os dados salvos estão num formato antigo. No editor do Apps Script, rode <b>atualizarDados</b> uma vez.'); return; }
+  if (!D || !D.t || !D.t.length){ mostrarAviso('Sem dados ainda. No editor do Apps Script, rode <b>atualizarDados</b> uma vez.'); return; }
+
+  $('btnAnt').onclick = () => irParaSemana(somaDias(periodo.de, -7));
+  $('btnProx').onclick = () => irParaSemana(somaDias(periodo.de, 7));
+  $('btnAtual').onclick = () => irParaSemana(segunda(hoje()));
+  $('btnAplicar').onclick = () => {
+    let de = $('fDe').value || limiteBusca(), ate = $('fAte').value || hoje();
+    if (de < limiteBusca()) de = limiteBusca();
+    if (ate > hoje()) ate = hoje();
+    if (de > ate) [de, ate] = [ate, de];
+    Object.assign(periodo, { de, ate, semana: false });
+    render();
+  };
+  $('btnRelatorio').onclick = abrirRelatorio;
+  $('btnRelatorio').disabled = false;
+  $('btnEnviar').onclick = enviarRelatorio;
+  $('btnFechar').onclick = () => $('modal').classList.remove('on');
+  $('modal').onclick = e => { if (e.target === $('modal')) $('modal').classList.remove('on'); };
+
+  google.script.run.withSuccessHandler(c => { if (c) CONFIG = c; }).getConfigRelatorio();
+  $('conteudo').style.display = '';
+  irParaSemana(segunda(hoje()));
+  mostrarUltima();
+  setInterval(mostrarUltima, 60000);
+  setInterval(() => carregar(false), RECARREGAR_MS);
+}
+
+carregar(true);
+</script>
+</body>
+</html>
