@@ -143,6 +143,12 @@
       <button class="btn ghost" id="btnAplicar">Buscar</button>
     </div>
 
+    <div class="card" style="margin-bottom:14px">
+      <h3>Por departamento</h3>
+      <div class="card-sub" id="subDepto">abertos e 1ª resposta no período · em dia e atrasos de agora</div>
+      <div class="tbl-wrap"><table class="dados" id="tblDepto"></table></div>
+    </div>
+
     <div class="secao" id="secPeriodo">No período</div>
     <div class="kpis">
       <div class="kpi"><div class="kpi-label">Abertos</div><div class="kpi-value" id="kAbertos">–</div><div class="kpi-sub" id="kAbertosSub"></div></div>
@@ -151,7 +157,7 @@
       <div class="kpi warn"><div class="kpi-label">Transferidos</div><div class="kpi-value" id="kTransf">–</div><div class="kpi-sub" id="kTransfSub"></div></div>
     </div>
 
-    <div class="secao">Agora · tickets de qualquer mês aguardando o BackOffice</div>
+    <div class="secao" id="secAgora">Agora · tickets aguardando o BackOffice</div>
     <div class="kpis">
       <div class="kpi warn"><div class="kpi-label">Aguardando BO</div><div class="kpi-value" id="kBO">–</div><div class="kpi-sub">vez do BackOffice responder</div></div>
       <div class="kpi ok"><div class="kpi-label">Em dia</div><div class="kpi-value" id="kDia">–</div><div class="kpi-sub">dentro de 1 dia útil</div></div>
@@ -173,11 +179,6 @@
       </div>
     </div>
 
-    <div class="card">
-      <h3>Por departamento</h3>
-      <div class="card-sub">abertos e 1ª resposta no período · em dia e atrasos de agora</div>
-      <div class="tbl-wrap"><table class="dados" id="tblDepto"></table></div>
-    </div>
 
     <div class="rodape">
       <span>SLA de 1 dia útil: vence no mesmo horário do próximo dia útil (fins de semana e feriados nacionais não contam).</span>
@@ -211,6 +212,7 @@
 let D = null;
 let CONFIG = { destinatarios: '', assunto: 'Relatório semanal de tickets · BackOffice · {semana}', urlPlanilha: '' };
 const DIAS_BUSCA = 30;               // busca personalizada: últimos 30 dias
+const JANELA_DIAS = 120;             // o painel só considera tickets abertos nos últimos 120 dias
 const RECARREGAR_MS = 10 * 60000;    // com a página aberta, busca dados novos a cada 10 min
 const DIA_SEM = ['dom','seg','ter','qua','qui','sex','sáb'];
 const URL_COMPLETO = '<?= urlGerencial ?>';
@@ -228,14 +230,22 @@ const rotuloPeriodo = () => `${diaCurto(periodo.de)} a ${diaCurto(periodo.ate)}/
 function irParaSemana(seg){ periodo.de = seg; periodo.ate = somaDias(seg, 6); periodo.semana = true; render(); }
 
 // ── Cálculos ───────────────────────────────────────────────────────────────
-const doPeriodo = () => D.t.filter(t => { const d = t[I.AB].slice(0, 10); return d >= periodo.de && d <= periodo.ate; });
+const inicioJanela = () => somaDias(hoje(), -(JANELA_DIAS - 1));
+/** Tickets que o painel considera: abertos nos últimos JANELA_DIAS dias (fica fora o histórico de 2025). */
+let _janela = null, _janelaDe = '';
+function janela(){
+  const de = inicioJanela();
+  if (_janelaDe !== de || !_janela || _janela.D !== D){ _janela = D.t.filter(t => t[I.AB].slice(0, 10) >= de); _janela.D = D; _janelaDe = de; }
+  return _janela;
+}
+const doPeriodo = () => janela().filter(t => { const d = t[I.AB].slice(0, 10); return d >= periodo.de && d <= periodo.ate; });
 
-/** Números do período (pela abertura) + retrato de agora (qualquer mês). */
+/** Números do período (pela abertura) + retrato de agora (tickets da janela de 120 dias). */
 function resumo(){
   const L = doPeriodo(), T = L.filter(transferido);
   const fech = L.filter(fechado).length;
   const agora = { bo: 0, emDia: 0, atrResp: 0, atrTransf: 0 };
-  for (const t of D.t){
+  for (const t of janela()){
     if (DEPTO_FORA.has(deptOf(t))) continue;
     const r = refBO(t); if (!r) continue;
     agora.bo++;
@@ -247,9 +257,12 @@ function resumo(){
 
 function porDepartamento(L){
   const m = new Map();
-  const linha = d => { if (!m.has(d)) m.set(d, { d, ab: 0, fe: 0, resp: [], dia: 0, ar: 0, at: 0 }); return m.get(d); };
+  const linha = d => { if (!m.has(d)) m.set(d, { d, ab: 0, fe: 0, resp: [], dia: 0, ar: 0, at: 0, ult: '' }); return m.get(d); };
   for (const t of L){ const r = linha(deptOf(t)); r.ab++; if (fechado(t)) r.fe++; if (t[I.TRESP] != null) r.resp.push(t[I.TRESP]); }
-  for (const t of D.t){
+  for (const t of janela()){
+    if (fechado(t)) continue;
+    // Últ. transferência: a mais recente entre os tickets não fechados do departamento (como no Titan)
+    if (transferido(t)){ const r = linha(deptOf(t)); if (t[I.TR_DT] > r.ult) r.ult = t[I.TR_DT]; }
     const b = refBO(t); if (!b) continue;
     const r = linha(deptOf(t));
     if (!b.atrasado) r.dia++; else if (b.motivo === 'transferencia') r.at++; else r.ar++;
@@ -269,6 +282,8 @@ function render(){
   $('fDe').min = $('fAte').min = limiteBusca(); $('fDe').max = $('fAte').max = hoje();
 
   const r = resumo();
+  $('secAgora').textContent = `Agora · tickets abertos desde ${fmtDia(inicioJanela())} (últimos ${JANELA_DIAS} dias) aguardando o BackOffice`;
+  $('subDepto').textContent = `abertos e 1ª resposta no período · em dia, atrasos e últ. transferência de agora (tickets desde ${fmtDia(inicioJanela())})`;
   $('kAbertos').textContent = fmt(r.abertos);
   $('kAbertosSub').textContent = `${diasDe(periodo.de, periodo.ate < hoje() ? periodo.ate : hoje()).length} dia(s) no período`;
   $('kFech').textContent = fmt(r.fechados);
@@ -288,7 +303,7 @@ function render(){
   $('grafDia').innerHTML = graficoDias(dias, cont);
 
   // Atrasos agora
-  const atrasados = D.t.filter(t => alerta(t) && !DEPTO_FORA.has(deptOf(t))).sort((a, b) => esperaH(b) - esperaH(a)).slice(0, 10);
+  const atrasados = janela().filter(t => alerta(t) && !DEPTO_FORA.has(deptOf(t))).sort((a, b) => esperaH(b) - esperaH(a)).slice(0, 10);
   $('listaAtrasos').innerHTML = atrasados.length ? atrasados.map(t => {
     const mot = motivoAtraso(t);
     return `<div class="atraso-row"><div class="tit">#${t[I.TID]} · ${esc(D.assuntos[t[I.SUBJ]] || '(sem assunto)')}</div>
@@ -300,10 +315,10 @@ function render(){
   const deps = porDepartamento(r.L);
   const tot = deps.reduce((s, x) => ({ ab: s.ab + x.ab, fe: s.fe + x.fe, dia: s.dia + x.dia, ar: s.ar + x.ar, at: s.at + x.at }), { ab: 0, fe: 0, dia: 0, ar: 0, at: 0 });
   const nz = v => v ? fmt(v) : '–';
-  $('tblDepto').innerHTML = `<thead><tr><th>Departamento</th><th>Abertos</th><th>Fechados</th><th>% fechados</th><th>1ª resposta</th><th>Em dia</th><th>Atraso · sem resposta</th><th>Atraso · transferência</th></tr></thead><tbody>`
+  $('tblDepto').innerHTML = `<thead><tr><th>Departamento</th><th>Abertos</th><th>Fechados</th><th>% fechados</th><th>1ª resposta</th><th>Em dia</th><th>Atraso · sem resposta</th><th>Atraso · transferência</th><th>Últ. transferência</th></tr></thead><tbody>`
     + deps.map(x => `<tr><td class="txt">${esc(x.d)}</td><td>${nz(x.ab)}</td><td>${nz(x.fe)}</td><td>${x.ab ? pct(x.fe, x.ab) : '–'}</td><td>${fmtH(mediana(x.resp))}</td>
-        <td>${nz(x.dia)}</td><td class="${x.ar ? 'alert-txt' : ''}">${nz(x.ar)}</td><td class="${x.at ? 'alert-txt' : ''}">${nz(x.at)}</td></tr>`).join('')
-    + `<tr class="total"><td>Total</td><td>${fmt(tot.ab)}</td><td>${fmt(tot.fe)}</td><td>${pct(tot.fe, tot.ab)}</td><td>${fmtH(r.resp)}</td><td>${fmt(tot.dia)}</td><td>${fmt(tot.ar)}</td><td>${fmt(tot.at)}</td></tr></tbody>`;
+        <td>${nz(x.dia)}</td><td class="${x.ar ? 'alert-txt' : ''}">${nz(x.ar)}</td><td class="${x.at ? 'alert-txt' : ''}">${nz(x.at)}</td><td>${x.ult ? fmtDia(x.ult) : '–'}</td></tr>`).join('')
+    + `<tr class="total"><td>Total</td><td>${fmt(tot.ab)}</td><td>${fmt(tot.fe)}</td><td>${pct(tot.fe, tot.ab)}</td><td>${fmtH(r.resp)}</td><td>${fmt(tot.dia)}</td><td>${fmt(tot.ar)}</td><td>${fmt(tot.at)}</td><td></td></tr></tbody>`;
 }
 
 /** Barras empilhadas por dia (fechados / ainda não fechados). */
@@ -357,19 +372,19 @@ function montarRelatorio(){
   ];
   const tabKpis = `<table style="${st.tab}"><tr>${kpis.map(k => `<th style="${st.th}">${k[0]}</th>`).join('')}</tr>`
     + `<tr>${kpis.map((k, i) => cel(k[1], i >= 5 && k[1] !== '0')).join('')}</tr></table>`;
-  const tabDep = `<table style="${st.tab}"><tr>${['Departamento', 'Abertos', 'Fechados', '% fechados', '1ª resposta', 'Em dia', 'Atraso · sem resposta', 'Atraso · transferência']
+  const tabDep = `<table style="${st.tab}"><tr>${['Departamento', 'Abertos', 'Fechados', '% fechados', '1ª resposta', 'Em dia', 'Atraso · sem resposta', 'Atraso · transferência', 'Últ. transferência']
       .map(h => `<th style="${st.th}">${h}</th>`).join('')}</tr>`
-    + deps.map(x => `<tr><td style="${st.tdl}">${esc(x.d)}</td>${cel(fmt(x.ab))}${cel(fmt(x.fe))}${cel(x.ab ? pct(x.fe, x.ab) : '–')}${cel(fmtH(mediana(x.resp)))}${cel(fmt(x.dia))}${cel(fmt(x.ar), x.ar)}${cel(fmt(x.at), x.at)}</tr>`).join('')
+    + deps.map(x => `<tr><td style="${st.tdl}">${esc(x.d)}</td>${cel(fmt(x.ab))}${cel(fmt(x.fe))}${cel(x.ab ? pct(x.fe, x.ab) : '–')}${cel(fmtH(mediana(x.resp)))}${cel(fmt(x.dia))}${cel(fmt(x.ar), x.ar)}${cel(fmt(x.at), x.at)}${cel(x.ult ? fmtDia(x.ult) : '–')}</tr>`).join('')
     + '</table>';
   // Tabela por assunto no formato do Titan (a mesma do relatório de atrasos)
   const tmp = document.createElement('table');
-  tmp.innerHTML = tabelaTitan(montarLinhas());
+  tmp.innerHTML = tabelaTitan(montarLinhas(null, janela()));
   const titan = tabelaParaEmail(tmp);
 
   const html = `<div>
     <p style="${st.h}"><b>Relatório semanal de tickets · BackOffice</b></p>
     <p style="${st.p}">Semana de ${semana} · dados atualizados em ${fmtData(D.geradoEm).replace(' ', ' às ')} (Metabase).
-      SLA de 1 dia útil: vence no mesmo horário do próximo dia útil.</p>
+      SLA de 1 dia útil: vence no mesmo horário do próximo dia útil. Considera tickets abertos desde ${fmtDia(inicioJanela())} (últimos ${JANELA_DIAS} dias).</p>
     <p style="${st.h3}"><b>Resumo da semana</b></p>${tabKpis}
     <p style="${st.h3}"><b>Por departamento</b></p>${tabDep}
     <p style="${st.h3}"><b>Situação por assunto</b></p>${titan}

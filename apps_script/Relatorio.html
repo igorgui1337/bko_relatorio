@@ -10,13 +10,14 @@ function mesAnterior(ym, n){ let [y, m] = ym.split('-').map(Number); m -= n; whi
 
 /**
  * Uma linha por assunto. "Abertos" e "Em processo" usam o mês de referência (padrão: o mês
- * da última atualização); "em dia" e "atraso" são o retrato de agora, de qualquer mês.
+ * da última atualização); "em dia" e "atraso" são o retrato de agora. lista: tickets
+ * considerados (padrão: todos, de qualquer mês; o Painel passa só a janela de 120 dias).
  */
-function montarLinhas(mesRef){
+function montarLinhas(mesRef, lista){
   const mesAtual = mesRef || D.geradoEm.slice(0, 7);
   const meses = [mesAnterior(mesAtual, 2), mesAnterior(mesAtual, 1), mesAtual];
   const porAssunto = new Map();
-  for (const t of D.t){
+  for (const t of lista || D.t){
     const depto = deptOf(t);
     if (DEPTO_FORA.has(depto)) continue;
     const k = t[I.SUBJ];
