@@ -67,18 +67,10 @@
   .kpi.bad .kpi-value{color:var(--danger)}
   .kpi-sub{font-size:10.5px;color:var(--muted);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-  .grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:12px;margin-bottom:12px}
-  @media (max-width:1000px){ .grid{grid-template-columns:minmax(0,1fr)} }
   .card{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:13px 15px 14px;box-shadow:var(--shadow-sm);min-width:0}
   .card h3{margin:0 0 2px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
   .card .card-sub{font-size:11px;color:var(--muted);margin-bottom:8px}
 
-  svg{display:block;max-width:100%}
-  .axis{fill:var(--muted);font-size:10px;font-family:var(--font)}
-  .gridline{stroke:var(--border);stroke-width:1}
-  .legend{display:flex;gap:12px;font-size:11px;color:var(--muted);margin-bottom:6px;flex-wrap:wrap}
-  .legend .lg{display:inline-flex;align-items:center;gap:5px}
-  .legend .sw{width:10px;height:10px;border-radius:2px}
 
   .tbl-wrap{overflow-x:auto}
   table.dados{width:100%;border-collapse:collapse;font-size:12.5px}
@@ -165,18 +157,10 @@
       <div class="kpi bad"><div class="kpi-label">Atraso · transferência</div><div class="kpi-value" id="kAtrTransf">–</div><div class="kpi-sub">sem retorno após a transferência</div></div>
     </div>
 
-    <div class="grid">
-      <div class="card">
-        <h3>Por dia</h3>
-        <div class="card-sub">tickets abertos em cada dia do período, pelo status atual</div>
-        <div class="legend"><span class="lg"><span class="sw" style="background:var(--st-closed)"></span>Fechados</span><span class="lg"><span class="sw" style="background:var(--accent)"></span>Ainda não fechados</span></div>
-        <div id="grafDia"></div>
-      </div>
-      <div class="card">
-        <h3>Atrasos agora</h3>
-        <div class="card-sub">10 tickets esperando o BO há mais tempo · SLA de 1 dia útil</div>
-        <div id="listaAtrasos"></div>
-      </div>
+    <div class="card" style="margin-bottom:12px">
+      <h3>Atrasos agora</h3>
+      <div class="card-sub">10 tickets esperando o BO há mais tempo · SLA de 1 dia útil</div>
+      <div id="listaAtrasos"></div>
     </div>
 
 
@@ -214,7 +198,6 @@ let CONFIG = { destinatarios: '', assunto: 'Relatório semanal de tickets · Bac
 const DIAS_BUSCA = 30;               // busca personalizada: últimos 30 dias
 const JANELA_DIAS = 120;             // o painel só considera tickets abertos nos últimos 120 dias
 const RECARREGAR_MS = 10 * 60000;    // com a página aberta, busca dados novos a cada 10 min
-const DIA_SEM = ['dom','seg','ter','qua','qui','sex','sáb'];
 const URL_COMPLETO = '<?= urlGerencial ?>';
 const periodo = { de: '', ate: '', semana: true };
 
@@ -296,11 +279,6 @@ function render(){
   $('kAtrResp').textContent = fmt(r.agora.atrResp);
   $('kAtrTransf').textContent = fmt(r.agora.atrTransf);
 
-  // Por dia
-  const dias = diasDe(periodo.de, periodo.ate);
-  const cont = new Map(dias.map(d => [d, { f: 0, n: 0 }]));
-  for (const t of r.L){ const c = cont.get(t[I.AB].slice(0, 10)); if (c) fechado(t) ? c.f++ : c.n++; }
-  $('grafDia').innerHTML = graficoDias(dias, cont);
 
   // Atrasos agora
   const atrasados = janela().filter(t => alerta(t) && !DEPTO_FORA.has(deptOf(t))).sort((a, b) => esperaH(b) - esperaH(a)).slice(0, 10);
@@ -319,34 +297,6 @@ function render(){
     + deps.map(x => `<tr><td class="txt">${esc(x.d)}</td><td>${nz(x.ab)}</td><td>${nz(x.fe)}</td><td>${x.ab ? pct(x.fe, x.ab) : '–'}</td><td>${fmtH(mediana(x.resp))}</td>
         <td>${nz(x.dia)}</td><td class="${x.ar ? 'alert-txt' : ''}">${nz(x.ar)}</td><td class="${x.at ? 'alert-txt' : ''}">${nz(x.at)}</td><td>${x.ult ? fmtDia(x.ult) : '–'}</td></tr>`).join('')
     + `<tr class="total"><td>Total</td><td>${fmt(tot.ab)}</td><td>${fmt(tot.fe)}</td><td>${pct(tot.fe, tot.ab)}</td><td>${fmtH(r.resp)}</td><td>${fmt(tot.dia)}</td><td>${fmt(tot.ar)}</td><td>${fmt(tot.at)}</td><td></td></tr></tbody>`;
-}
-
-/** Barras empilhadas por dia (fechados / ainda não fechados). */
-function graficoDias(dias, cont){
-  const W = 760, H = 220, pl = 40, pr = 8, pt = 16, pb = 34;
-  const n = dias.length, bw = (W - pl - pr) / n, ih = H - pt - pb;
-  const tot = dias.map(d => cont.get(d).f + cont.get(d).n);
-  let max = Math.max(1, ...tot);
-  const ordem = Math.pow(10, Math.floor(Math.log10(max)));
-  const step = ordem * ([1, 2, 5].find(m => max / (ordem * m) <= 5) || 10);
-  max = Math.ceil(max / step) * step;
-  const y = v => pt + ih - v / max * ih;
-  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img">`;
-  for (let v = 0; v <= max; v += step) s += `<line class="gridline" x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}"/><text class="axis" x="${pl - 6}" y="${y(v) + 3}" text-anchor="end">${fmt(v)}</text>`;
-  const gap = Math.min(14, bw * 0.3), cada = Math.ceil(n / 16);
-  dias.forEach((d, i) => {
-    const x = pl + i * bw + gap / 2, w = Math.max(1, bw - gap), c = cont.get(d);
-    const futuro = d > hoje();
-    if (c.f) s += `<rect x="${x}" y="${y(c.f)}" width="${w}" height="${y(0) - y(c.f)}" rx="2" fill="var(--st-closed)"><title>${diaCurto(d)} · fechados: ${fmt(c.f)}</title></rect>`;
-    if (c.n) s += `<rect x="${x}" y="${y(c.f + c.n)}" width="${w}" height="${y(c.f) - y(c.f + c.n)}" rx="2" fill="var(--accent)"><title>${diaCurto(d)} · ainda não fechados: ${fmt(c.n)}</title></rect>`;
-    if (tot[i]) s += `<text class="axis" x="${x + w / 2}" y="${y(tot[i]) - 4}" text-anchor="middle" style="font-weight:700;fill:var(--ink)">${fmt(tot[i])}</text>`;
-    if (i % cada === 0){
-      const wd = DIA_SEM[new Date(d + 'T00:00:00Z').getUTCDay()];
-      s += `<text class="axis" x="${x + w / 2}" y="${H - pb + 14}" text-anchor="middle" style="${d === hoje() ? 'font-weight:800;fill:var(--ink)' : ''}${futuro ? ';opacity:.45' : ''}">${wd}</text>`
-        + `<text class="axis" x="${x + w / 2}" y="${H - pb + 26}" text-anchor="middle"${futuro ? ' style="opacity:.45"' : ''}>${diaCurto(d)}</text>`;
-    }
-  });
-  return s + '</svg>';
 }
 
 // ── Relatório semanal ──────────────────────────────────────────────────────
