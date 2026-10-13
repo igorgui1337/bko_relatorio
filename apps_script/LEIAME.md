@@ -114,7 +114,7 @@ Painel para acompanhar a semana, com link para o painel completo. Pode ser coloc
   - "Agora" (aguardando BO, em dia e atrasos) é o retrato do momento, com o SLA de 1 dia útil.
   - **O painel só considera tickets abertos nos últimos 120 dias** (`JANELA_DIAS` no `Painel.html`), inclusive no relatório semanal; os atrasos mais antigos aparecem só no relatório de atrasos (`?v=diretoria`).
 - **Conteúdo:** de cima para baixo:
-  - a tabela por departamento, com a última transferência de assunto;
+  - a tabela **por assunto** (com o departamento ao lado, ordenada como no Titan: por departamento e, dentro dele, mais atrasos primeiro), com a última transferência de assunto;
   - os cartões do período e de agora;
   - os 10 atrasos mais antigos.
 - **Contexto dos números:**

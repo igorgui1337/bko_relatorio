@@ -78,7 +78,7 @@
   .tbl-wrap{overflow-x:auto}
   table.dados{width:100%;border-collapse:collapse;font-size:12.5px}
   table.dados th, table.dados td{padding:6px 8px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;font-variant-numeric:tabular-nums}
-  table.dados th:first-child, table.dados td:first-child{text-align:left}
+  table.dados th:first-child, table.dados td:first-child, table.dados th.txt{text-align:left}
   table.dados thead th{color:var(--muted);font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;background:var(--surface-2)}
   table.dados tr.total td{font-weight:800;border-top:2px solid var(--border)}
   .alert-txt{color:var(--danger);font-weight:700}
@@ -140,7 +140,7 @@
     </div>
 
     <div class="card" style="margin-bottom:14px">
-      <h3>Por departamento</h3>
+      <h3>Por assunto</h3>
       <div class="card-sub" id="subDepto">abertos e 1ª resposta no período · em dia e atrasos de agora</div>
       <div class="tbl-wrap"><table class="dados" id="tblDepto"></table></div>
     </div>
@@ -284,21 +284,34 @@ function resumo(){
   return { L, ...numerosDe(L, D.geradoEm), agora };
 }
 
-function porDepartamento(L){
+/**
+ * Agrega por grupo: abertos/fechados/1ª resposta no período (L) e em dia/atrasos/últ. transferência
+ * de agora (tickets da janela). porAssunto: uma linha por assunto (painel); senão por departamento (e-mail).
+ */
+function agrupar(L, porAssunto){
   const m = new Map();
-  const linha = d => { if (!m.has(d)) m.set(d, { d, ab: 0, fe: 0, resp: [], dia: 0, ar: 0, at: 0, ult: '' }); return m.get(d); };
-  for (const t of L){ const r = linha(deptOf(t)); r.ab++; if (fechado(t)) r.fe++; if (t[I.TRESP] != null) r.resp.push(t[I.TRESP]); }
+  const linha = t => {
+    const k = porAssunto ? t[I.SUBJ] : deptOf(t);
+    if (!m.has(k)) m.set(k, { assunto: porAssunto ? (D.assuntos[t[I.SUBJ]] || '(sem assunto)') : '', d: deptOf(t),
+      ab: 0, fe: 0, resp: [], dia: 0, ar: 0, at: 0, ult: '' });
+    return m.get(k);
+  };
+  for (const t of L){ const r = linha(t); r.ab++; if (fechado(t)) r.fe++; if (t[I.TRESP] != null) r.resp.push(t[I.TRESP]); }
   for (const t of janela()){
     if (fechado(t)) continue;
-    // Últ. transferência: a mais recente entre os tickets não fechados do departamento (como no Titan)
-    if (transferido(t)){ const r = linha(deptOf(t)); if (t[I.TR_DT] > r.ult) r.ult = t[I.TR_DT]; }
+    // Últ. transferência: a mais recente entre os tickets não fechados do grupo (como no Titan)
+    if (transferido(t)){ const r = linha(t); if (t[I.TR_DT] > r.ult) r.ult = t[I.TR_DT]; }
     const b = refBO(t); if (!b) continue;
-    const r = linha(deptOf(t));
+    const r = linha(t);
     if (!b.atrasado) r.dia++; else if (b.motivo === 'transferencia') r.at++; else r.ar++;
   }
-  return [...m.values()].filter(r => !DEPTO_FORA.has(r.d) && (r.ab || r.dia || r.ar || r.at))
-    .sort((a, b) => (b.ar + b.at) - (a.ar + a.at) || b.ab - a.ab || a.d.localeCompare(b.d, 'pt-BR'));
+  const linhas = [...m.values()].filter(r => !DEPTO_FORA.has(r.d) && (r.ab || r.dia || r.ar || r.at));
+  return porAssunto
+    // como no Titan: por departamento e, dentro dele, mais atrasos primeiro
+    ? linhas.sort((a, b) => a.d.localeCompare(b.d, 'pt-BR') || (b.ar + b.at) - (a.ar + a.at) || b.ab - a.ab || a.assunto.localeCompare(b.assunto, 'pt-BR'))
+    : linhas.sort((a, b) => (b.ar + b.at) - (a.ar + a.at) || b.ab - a.ab || a.d.localeCompare(b.d, 'pt-BR'));
 }
+const porDepartamento = L => agrupar(L, false);
 
 // ── Render ─────────────────────────────────────────────────────────────────
 function render(){
@@ -352,14 +365,14 @@ function render(){
       <div class="det"><span class="tag ${mot === 'transferencia' ? 'transf' : 'resp'}">${mot === 'transferencia' ? 'TRANSFERÊNCIA' : 'SEM RESPOSTA'}</span>${esc(deptOf(t))} · desde ${fmtData(refBO(t).ref)}</div></div>`;
   }).join('') : '<div class="aviso">Nenhum ticket em atraso agora</div>';
 
-  // Por departamento
-  const deps = porDepartamento(r.L);
+  // Por assunto (com o departamento ao lado)
+  const deps = agrupar(r.L, true);
   const tot = deps.reduce((s, x) => ({ ab: s.ab + x.ab, fe: s.fe + x.fe, dia: s.dia + x.dia, ar: s.ar + x.ar, at: s.at + x.at }), { ab: 0, fe: 0, dia: 0, ar: 0, at: 0 });
   const nz = v => v ? fmt(v) : '–';
-  $('tblDepto').innerHTML = `<thead><tr><th>Departamento</th><th>Abertos</th><th>Fechados</th><th>% fechados</th><th>1ª resposta</th><th>Em dia</th><th>Atraso · sem resposta</th><th>Atraso · transferência</th><th>Últ. transferência</th></tr></thead><tbody>`
-    + deps.map(x => `<tr><td class="txt">${esc(x.d)}</td><td>${nz(x.ab)}</td><td>${nz(x.fe)}</td><td>${x.ab ? pct(x.fe, x.ab) : '–'}</td><td>${fmtH(mediana(x.resp))}</td>
+  $('tblDepto').innerHTML = `<thead><tr><th>Assunto</th><th class="txt">Departamento</th><th>Abertos</th><th>Fechados</th><th>% fechados</th><th>1ª resposta</th><th>Em dia</th><th>Atraso · sem resposta</th><th>Atraso · transferência</th><th>Últ. transferência</th></tr></thead><tbody>`
+    + deps.map(x => `<tr><td class="txt" title="${esc(x.assunto)}">${esc(x.assunto)}</td><td class="txt">${esc(x.d)}</td><td>${nz(x.ab)}</td><td>${nz(x.fe)}</td><td>${x.ab ? pct(x.fe, x.ab) : '–'}</td><td>${fmtH(mediana(x.resp))}</td>
         <td>${nz(x.dia)}</td><td class="${x.ar ? 'alert-txt' : ''}">${nz(x.ar)}</td><td class="${x.at ? 'alert-txt' : ''}">${nz(x.at)}</td><td>${x.ult ? fmtDia(x.ult) : '–'}</td></tr>`).join('')
-    + `<tr class="total"><td>Total</td><td>${fmt(tot.ab)}</td><td>${fmt(tot.fe)}</td><td>${pct(tot.fe, tot.ab)}</td><td>${fmtH(r.resp)}</td><td>${fmt(tot.dia)}</td><td>${fmt(tot.ar)}</td><td>${fmt(tot.at)}</td><td></td></tr></tbody>`;
+    + `<tr class="total"><td>Total</td><td></td><td>${fmt(tot.ab)}</td><td>${fmt(tot.fe)}</td><td>${pct(tot.fe, tot.ab)}</td><td>${fmtH(r.resp)}</td><td>${fmt(tot.dia)}</td><td>${fmt(tot.ar)}</td><td>${fmt(tot.at)}</td><td></td></tr></tbody>`;
 }
 
 // ── Relatório semanal ──────────────────────────────────────────────────────
