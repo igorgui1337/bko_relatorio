@@ -27,6 +27,7 @@ Vêm das colunas `last_transference` e `transfer_*` da pergunta 274. O valor é 
 | `Code.gs` | Busca no Metabase, consolida por ticket, grava no Drive e serve a página |
 | `Departamentos.gs` | Mapeamento assunto → departamento (gerado do `Departamentos.xlsx`) |
 | `Index.html` | Dashboard (design W1 do relatório de exemplo; os filtros cruzados rodam no navegador) |
+| `Diretoria.html` | Resumo Diretoria: visão macro de tickets e transferências, comparando com o período anterior (`/exec?v=diretoria`) |
 | `appsscript.json` | Manifesto: fuso de São Paulo, escopos e configuração do web app |
 
 ## Fonte: Metabase
@@ -68,6 +69,20 @@ Quando mudar `Index.html` ou `Code.gs`, faça uma nova versão em Implantar > Ge
 O fluxo completo também foi rodado contra o Metabase real:
 - Carga completa: 57.141 tickets em 82 s.
 - Incremental de 60 dias logo depois: 20 s, com resultado idêntico ao da carga completa (0 diferenças). Para ver a página fora do Google, substitua `<?!= dados ?>` no `Index.html` pelo JSON gerado e abra o arquivo no navegador.
+
+## Resumo Diretoria (`?v=diretoria`)
+
+É uma página só, para a diretoria, com os mesmos dados do painel gerencial. Ela tem dois blocos:
+- **Tickets:** abertos, % fechados, mediana da 1ª resposta, e o retrato de hoje (aguardando BO e fora do SLA).
+- **Transferências:** transferidos, outra/mesma área, mediana até transferir, principais fluxos e áreas de destino.
+
+Funcionamento:
+- **Período:** mês, trimestre ou ano, filtrado pela data de abertura. O padrão é o último período já fechado.
+- **Comparação:** cada número mostra a variação em relação ao período anterior.
+- **Impressão:** o botão "Imprimir / PDF" gera uma folha A4 em tema claro.
+- **Acesso:** o link é a mesma URL `/exec` com `?v=diretoria` no final. Para testar sem publicar, use **Implantar › Testar implantações** e abra a URL `/dev` com `?v=diretoria`.
+
+As regras de cálculo (fila, SLA, 1ª resposta e transferências) estão **copiadas** do `Index.html`. Se mudar uma regra, mude nas duas páginas.
 
 ## Observações
 

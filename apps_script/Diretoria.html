@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<base target="_top">
+<meta charset="utf-8"/>
+<title>Resumo Diretoria · Tickets BackOffice</title>
+<style>
+  /* ═════════════════════ DESIGN TOKENS (paleta W1, iguais ao Index.html) ═════════════════════ */
+  :root, :root[data-theme="light"]{
+    --bg:#f4f7f6; --surface:#ffffff; --surface-2:#eef3f2;
+    --ink:#0c2b2b; --muted:#5a6b6a; --border:#dbe4e3;
+    --brand:#0b494b; --brand-2:#0f6d70; --brand-3:#13908f; --brand-4:#2bb3b0;
+    --accent:#e8a33d; --accent-soft:rgba(232,163,61,.14);
+    --on-brand:#ffffff;
+    --ok:#0b7a5b; --danger:#c0442e;
+    --st-closed:#0b7a5b;
+    --shadow-sm:0 1px 2px rgba(11,73,75,.05);
+    --font:'Segoe UI',-apple-system,Roboto,Helvetica,Arial,sans-serif;
+  }
+  :root[data-theme="dark"]{
+    --bg:#071615; --surface:#0e211f; --surface-2:#122a28;
+    --ink:#e7efee; --muted:#9bb0ae; --border:#1d3a37;
+    --brand:#2bb3b0; --brand-2:#38c0bd; --brand-3:#17a3a1; --brand-4:#5fd0cd;
+    --accent:#f0b45a; --accent-soft:rgba(240,180,90,.14);
+    --on-brand:#04211f;
+    --ok:#3fc79a; --danger:#e8735b;
+    --st-closed:#3fc79a;
+    --shadow-sm:0 1px 2px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13.5px/1.5 var(--font)}
+  .pagina{max-width:1100px;margin:0 auto;padding:20px 22px 32px}
+  @media (max-width:600px){ .pagina{padding:14px 16px 24px} }
+
+  /* ─── Cabeçalho ─── */
+  .topo{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:18px;
+    padding-bottom:14px;border-bottom:2px solid var(--brand)}
+  .brand-dot{width:38px;height:38px;border-radius:9px;background:var(--brand);flex:none;
+    display:flex;align-items:center;justify-content:center;color:var(--on-brand);font-weight:900;font-size:14px}
+  .topo h1{margin:0;font-size:20px;color:var(--brand);font-weight:800;line-height:1.2}
+  .topo .periodo{color:var(--muted);font-size:12.5px;margin-top:2px}
+  .controles{display:flex;gap:8px;margin-left:auto;align-items:center;flex-wrap:wrap}
+  select{padding:6px 8px;font-size:12px;font-family:var(--font);background:var(--surface);color:var(--ink);
+    border:1px solid var(--border);border-radius:6px}
+  .btn{padding:7px 12px;font-size:12px;font-weight:700;border-radius:7px;border:0;cursor:pointer;
+    font-family:var(--font);background:var(--brand);color:var(--on-brand)}
+  .btn:hover{background:var(--brand-2)}
+
+  /* ─── Blocos ─── */
+  .bloco{margin-bottom:20px;break-inside:avoid}
+  .bloco h2{margin:0 0 10px;font-size:13px;font-weight:800;color:var(--ink);text-transform:uppercase;
+    letter-spacing:.06em;display:flex;align-items:center;gap:8px}
+  .bloco h2::before{content:"";width:4px;height:16px;border-radius:2px;background:var(--brand-3)}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:12px}
+  .kpi{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:13px 15px;
+    box-shadow:var(--shadow-sm);break-inside:avoid}
+  .kpi-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700}
+  .kpi-value{font-size:28px;font-weight:800;color:var(--brand);margin-top:3px;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+  .kpi-value.bad{color:var(--danger)}
+  .kpi-sub{font-size:11px;color:var(--muted);margin-top:1px}
+  .delta{font-size:11.5px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+  .delta.bom{color:var(--ok)} .delta.ruim{color:var(--danger)} .delta.neutro{color:var(--muted)}
+  .tag-hoje{display:inline-block;font-size:9.5px;font-weight:800;letter-spacing:.05em;color:var(--brand-2);
+    background:color-mix(in srgb,var(--brand-3) 14%,transparent);border-radius:4px;padding:1px 5px;margin-left:5px;vertical-align:1px}
+
+  .linha{display:grid;grid-template-columns:minmax(0,3fr) minmax(0,2fr);gap:10px}
+  @media (max-width:900px){ .linha{grid-template-columns:minmax(0,1fr)} }
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:13px 15px 14px;
+    box-shadow:var(--shadow-sm);min-width:0;break-inside:avoid}
+  .card h3{margin:0 0 2px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  .card .card-sub{font-size:11px;color:var(--muted);margin-bottom:8px}
+
+  svg{display:block;max-width:100%}
+  .axis{fill:var(--muted);font-size:10px;font-family:var(--font)}
+  .gridline{stroke:var(--border);stroke-width:1}
+  .legend{display:flex;gap:12px;font-size:11px;color:var(--muted);margin-bottom:6px;flex-wrap:wrap}
+  .legend .lg{display:inline-flex;align-items:center;gap:5px}
+  .legend .sw{width:10px;height:10px;border-radius:2px}
+
+  .hbar-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 8px;align-items:center;padding:4px 2px;font-size:12px}
+  .hbar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hbar-label small{color:var(--muted);margin-left:6px}
+  .hbar-count{font-size:11.5px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
+  .hbar-track{position:relative;height:12px;background:var(--surface-2);border-radius:3px;overflow:hidden;grid-column:1/-1}
+  .hbar-fill{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--brand-3),var(--brand-4));border-radius:3px}
+  .hbar-fill.acc{background:linear-gradient(90deg,var(--accent),color-mix(in srgb,var(--accent) 75%,white))}
+
+  .rodape{font-size:11px;color:var(--muted);border-top:1px solid var(--border);padding-top:10px;
+    display:flex;gap:12px;flex-wrap:wrap;justify-content:space-between}
+  .rodape a{color:var(--brand-2);font-weight:700}
+  .aviso{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:22px;
+    text-align:center;color:var(--muted);font-style:italic}
+
+  /* ─── Impressão: A4, tema claro, sem controles ─── */
+  @page{size:A4;margin:12mm}
+  @media print{
+    :root, :root[data-theme]{
+      --bg:#fff; --surface:#fff; --surface-2:#eef3f2; --ink:#0c2b2b; --muted:#5a6b6a; --border:#dbe4e3;
+      --brand:#0b494b; --brand-2:#0f6d70; --brand-3:#13908f; --brand-4:#2bb3b0; --accent:#e8a33d;
+      --ok:#0b7a5b; --danger:#c0442e; --st-closed:#0b7a5b; --shadow-sm:none;
+    }
+    body{font-size:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .pagina{max-width:none;padding:0}
+    .controles{display:none}
+    .kpi-value{font-size:22px}
+    .linha{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}
+    .kpis{grid-template-columns:repeat(5,minmax(0,1fr))}
+    .bloco-transf .kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+  }
+</style>
+</head>
+<body>
+<div class="pagina">
+  <header class="topo">
+    <div class="brand-dot">W1</div>
+    <div>
+      <h1>Relatório de Tickets · BackOffice</h1>
+      <div class="periodo" id="periodoLabel">Carregando dados…</div>
+    </div>
+    <div class="controles">
+      <select id="selTipo" title="Tipo de período">
+        <option value="M">Mês</option>
+        <option value="Q">Trimestre</option>
+        <option value="A">Ano</option>
+      </select>
+      <select id="selPeriodo" title="Período"></select>
+      <button class="btn" id="btnImprimir" title="Imprimir ou salvar em PDF">Imprimir / PDF</button>
+    </div>
+  </header>
+
+  <div id="aviso" class="aviso" style="display:none"></div>
+
+  <div id="conteudo" style="display:none">
+    <!-- ═════════════ TICKETS ═════════════ -->
+    <section class="bloco">
+      <h2>Tickets</h2>
+      <div class="kpis">
+        <div class="kpi"><div class="kpi-label">Tickets abertos</div><div class="kpi-value" id="kTotal">–</div><div class="delta" id="dTotal"></div></div>
+        <div class="kpi"><div class="kpi-label">Fechados</div><div class="kpi-value" id="kFech">–</div><div class="kpi-sub" id="kFechSub"></div><div class="delta" id="dFech"></div></div>
+        <div class="kpi"><div class="kpi-label">1ª resposta (mediana)</div><div class="kpi-value" id="kResp">–</div><div class="kpi-sub">da abertura à 1ª resposta do BO</div><div class="delta" id="dResp"></div></div>
+        <div class="kpi"><div class="kpi-label">Aguardando BO <span class="tag-hoje">HOJE</span></div><div class="kpi-value" id="kBO">–</div><div class="kpi-sub">última mensagem do consultor</div></div>
+        <div class="kpi"><div class="kpi-label">Fora do SLA <span class="tag-hoje">HOJE</span></div><div class="kpi-value bad" id="kSla">–</div><div class="kpi-sub" id="kSlaSub"></div></div>
+      </div>
+      <div class="linha">
+        <div class="card">
+          <h3>Volume por mês</h3>
+          <div class="card-sub">tickets por mês de abertura, pelo status atual</div>
+          <div class="legend" id="volLegend"></div>
+          <div id="volChart"></div>
+        </div>
+        <div class="card">
+          <h3>Departamentos</h3>
+          <div class="card-sub">5 com mais tickets no período · % fechados</div>
+          <div id="topDept"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═════════════ TRANSFERÊNCIAS ═════════════ -->
+    <section class="bloco bloco-transf">
+      <h2>Transferências</h2>
+      <div class="kpis">
+        <div class="kpi"><div class="kpi-label">Tickets transferidos</div><div class="kpi-value" id="tTotal">–</div><div class="kpi-sub" id="tTotalSub"></div><div class="delta" id="dTTotal"></div></div>
+        <div class="kpi"><div class="kpi-label">Para outra área</div><div class="kpi-value" id="tOutra">–</div><div class="kpi-sub" id="tOutraSub"></div><div class="delta" id="dTOutra"></div></div>
+        <div class="kpi"><div class="kpi-label">Na mesma área</div><div class="kpi-value" id="tMesma">–</div><div class="kpi-sub" id="tMesmaSub"></div><div class="delta" id="dTMesma"></div></div>
+        <div class="kpi"><div class="kpi-label">Tempo até transferir (mediana)</div><div class="kpi-value" id="tTempo">–</div><div class="kpi-sub">da abertura à transferência</div><div class="delta" id="dTTempo"></div></div>
+      </div>
+      <div class="linha">
+        <div class="card">
+          <h3>Principais fluxos</h3>
+          <div class="card-sub">área de origem → área de destino · 5 maiores no período</div>
+          <div id="fluxos"></div>
+        </div>
+        <div class="card">
+          <h3>Áreas que mais recebem</h3>
+          <div class="card-sub">destino das transferências · 5 maiores</div>
+          <div id="destinos"></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="rodape">
+      <span id="atualizado"></span>
+      <span>Detalhes no <a href="<?= urlGerencial ?>">painel gerencial</a></span>
+    </footer>
+  </div>
+</div>
+
+<script>
+// ═════════════════════════════════════════════════════════════════════════════
+// Resumo Diretoria — visão macro dos mesmos dados do painel gerencial (Index.html).
+// Regras de negócio copiadas do Index.html; manter as duas páginas iguais.
+// ═════════════════════════════════════════════════════════════════════════════
+let D = null;
+
+// Formato da linha de ticket: ver codificar_() no Code.gs (igual ao Index.html)
+const I = {TID:0, SUBJ:1, ST:2, AB:3, RESP:4, ULT:5, TPROC:6, TRESP:7, NMSG:8, NTROCAS:9, AN:10, CONS:11, ESC:12,
+           FILA:13, TR_DT:14, TR_DE:15, TR_PARA:16, TR_AREA_DE:17, TR_AREA_PARA:18, TR_TIPO:19};
+const VERSAO_DADOS = 2;   // igual ao Code.gs
+const FILA_BO = 1;
+const SEM_DEPTO = 'Sem Departamento';
+const MES_PT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+// ── Helpers (iguais ao Index.html) ─────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString('pt-BR');
+const pct = (a, b) => b ? (a / b * 100).toFixed(1).replace('.', ',') + '%' : '–';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function mediana(arr){
+  if (!arr.length) return null;
+  const s = arr.slice().sort((a, b) => a - b), m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+function fmtH(h){
+  if (h == null || isNaN(h)) return '–';
+  if (h < 1) return Math.round(h * 60) + 'min';
+  if (h < 24){ const m = Math.round((h % 1) * 60); return Math.floor(h) + 'h' + (m ? ' ' + m + 'min' : ''); }
+  const hr = Math.round(h); return Math.floor(hr / 24) + 'd ' + (hr % 24) + 'h';
+}
+const fmtData = s => s ? `${s.slice(8,10)}/${s.slice(5,7)}/${s.slice(0,4)} ${s.slice(11)}` : '–';
+const statusKey = t => D.statusOrdem[t[I.ST]] || '';
+const deptOf = t => t[I.SUBJ] >= 0 ? D.departamentos[D.deptPorAssunto[t[I.SUBJ]]] : SEM_DEPTO;
+const horasEntre = (a, b) => (Date.parse(b.replace(' ', 'T') + ':00Z') - Date.parse(a.replace(' ', 'T') + ':00Z')) / 3600000;
+const aguardandoBO = t => t[I.FILA] === FILA_BO;
+const esperaH = t => t[I.ULT] ? horasEntre(t[I.ULT], D.geradoEm) : (t[I.TPROC] || 0);
+const alerta = t => aguardandoBO(t) && esperaH(t) > D.slaH;
+const transferido = t => t.length > I.TR_DT;
+const tipoTransf = t => transferido(t) ? (D.tiposTransf[t[I.TR_TIPO]] || 'Transferido') : '';
+const nomeMes = ym => `${MES_PT[+ym.slice(5, 7) - 1]}/${ym.slice(0, 4)}`;
+
+/** Barras verticais em SVG (mesma função do Index.html, sem a linha de SLA). */
+function barChart(labels, series, opt = {}){
+  if (!labels.length) return '<div class="aviso">Sem dados no período</div>';
+  const W = 900, H = 230, pl = 44, pr = 10, pt = 14, pb = 30;
+  const n = labels.length, iw = W - pl - pr, ih = H - pt - pb, bw = iw / n;
+  const tot = labels.map((_, i) => opt.stacked ? series.reduce((a, s) => a + s.values[i], 0) : Math.max(...series.map(s => s.values[i])));
+  let max = Math.max(1, ...tot);
+  const step = Math.pow(10, Math.floor(Math.log10(max))) * ([1, 2, 5].find(m => max / (Math.pow(10, Math.floor(Math.log10(max))) * m) <= 5) || 10);
+  max = Math.ceil(max / step) * step;
+  const y = v => pt + ih - v / max * ih;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img">`;
+  for (let v = 0; v <= max; v += step){
+    s += `<line class="gridline" x1="${pl}" x2="${W - pr}" y1="${y(v)}" y2="${y(v)}"/>`;
+    s += `<text class="axis" x="${pl - 6}" y="${y(v) + 3}" text-anchor="end">${fmt(v)}</text>`;
+  }
+  const gap = Math.min(14, bw * 0.3);
+  labels.forEach((lb, i) => {
+    const x = pl + i * bw + gap / 2, w = Math.max(1, bw - gap);
+    const destaque = !opt.destaque || opt.destaque[i];
+    let acc = 0;
+    for (const se of series){
+      const v = se.values[i]; if (!v) continue;
+      const y0 = opt.stacked ? y(acc + v) : y(v), h = (opt.stacked ? y(acc) : y(0)) - y0;
+      s += `<rect x="${x}" y="${y0}" width="${w}" height="${Math.max(0, h)}" rx="2" fill="${se.cor}" opacity="${destaque ? 1 : .35}"><title>${esc(lb)} · ${esc(se.label)}: ${fmt(v)}</title></rect>`;
+      if (opt.stacked) acc += v;
+    }
+    s += `<text class="axis" x="${x + w / 2}" y="${H - pb + 15}" text-anchor="middle" style="${destaque ? 'font-weight:700;fill:var(--ink)' : ''}">${esc(lb)}</text>`;
+    if (tot[i]) s += `<text class="axis" x="${x + w / 2}" y="${y(tot[i]) - 4}" text-anchor="middle" style="font-weight:700;fill:var(--ink)">${fmt(tot[i])}</text>`;
+  });
+  return s + '</svg>';
+}
+
+function hbars(el, itens){
+  el.innerHTML = itens.length ? '' : '<div class="aviso">Sem dados no período</div>';
+  const max = Math.max(1, ...itens.map(i => i.valor));
+  for (const it of itens){
+    const row = document.createElement('div');
+    row.className = 'hbar-row';
+    row.innerHTML = `<div class="hbar-label" title="${esc(it.label)}">${esc(it.label)}${it.extra ? `<small>${esc(it.extra)}</small>` : ''}</div>
+      <div class="hbar-count">${fmt(it.valor)}</div>
+      <div class="hbar-track"><div class="hbar-fill ${it.classe || ''}" style="width:${it.valor / max * 100}%"></div></div>`;
+    el.appendChild(row);
+  }
+}
+
+// ── Períodos ───────────────────────────────────────────────────────────────
+// Chave: 'YYYY-MM' (mês), 'YYYY-Qn' (trimestre), 'YYYY' (ano). Filtro pela data de abertura, como no gerencial.
+let MES_MIN = '', MES_ATUAL = '';
+
+function mesesEntre(a, b){
+  const out = []; let [y, m] = a.split('-').map(Number);
+  for (;;){ const k = `${y}-${String(m).padStart(2, '0')}`; if (k > b) break; out.push(k); if (++m > 12){ m = 1; y++; } }
+  return out;
+}
+function mesesDoPeriodo(k){
+  if (/^\d{4}-\d{2}$/.test(k)) return [k];
+  if (/^\d{4}-Q\d$/.test(k)){ const y = k.slice(0, 4), q = +k.slice(-1); return [1, 2, 3].map(i => `${y}-${String((q - 1) * 3 + i).padStart(2, '0')}`); }
+  return Array.from({ length: 12 }, (_, i) => `${k}-${String(i + 1).padStart(2, '0')}`);
+}
+function anterior(k){
+  if (/^\d{4}-\d{2}$/.test(k)){ let [y, m] = k.split('-').map(Number); if (--m < 1){ m = 12; y--; } return `${y}-${String(m).padStart(2, '0')}`; }
+  if (/^\d{4}-Q\d$/.test(k)){ let y = +k.slice(0, 4), q = +k.slice(-1); if (--q < 1){ q = 4; y--; } return `${y}-Q${q}`; }
+  return String(+k - 1);
+}
+function rotulo(k){
+  if (/^\d{4}-\d{2}$/.test(k)) return nomeMes(k);
+  if (/^\d{4}-Q\d$/.test(k)) return `${k.slice(-1)}º tri/${k.slice(0, 4)}`;
+  return k;
+}
+const parcial = k => mesesDoPeriodo(k).includes(MES_ATUAL);
+const temDados = k => mesesDoPeriodo(k).some(m => m >= MES_MIN && m <= MES_ATUAL);
+
+function periodosDisponiveis(tipo){
+  const meses = mesesEntre(MES_MIN, MES_ATUAL);
+  const chave = m => tipo === 'M' ? m : tipo === 'Q' ? `${m.slice(0, 4)}-Q${Math.ceil(+m.slice(5, 7) / 3)}` : m.slice(0, 4);
+  return [...new Set(meses.map(chave))].reverse();   // mais recente primeiro
+}
+
+function ticketsDe(k){
+  const meses = new Set(mesesDoPeriodo(k));
+  return D.t.filter(t => meses.has(t[I.AB].slice(0, 7)));
+}
+
+/** Indicadores de um conjunto de tickets (mesmas regras do gerencial). */
+function indicadores(L){
+  const T = L.filter(transferido);
+  const fech = L.filter(t => statusKey(t) === 'closed').length;
+  return {
+    total: L.length,
+    fechados: fech,
+    pctFech: L.length ? fech / L.length * 100 : null,
+    respMed: mediana(L.map(t => t[I.TRESP]).filter(h => h != null)),
+    transf: T.length,
+    outra: T.filter(t => tipoTransf(t) === 'Outra área').length,
+    mesma: T.filter(t => tipoTransf(t) === 'Mesma área').length,
+    transfMed: mediana(T.filter(t => t[I.AB]).map(t => horasEntre(t[I.AB], t[I.TR_DT])).filter(h => h >= 0)),
+  };
+}
+
+/**
+ * Variação contra o período anterior.
+ * modo: 'pct' (variação %), 'pp' (pontos percentuais), 'tempo' (variação % de duração).
+ * melhor: 'sobe' | 'desce' | null (neutro).
+ */
+function delta(el, atual, ant, modo, melhor, rotAnt){
+  if (atual == null || ant == null || (modo !== 'pp' && !ant)){ el.textContent = rotAnt ? `sem base em ${rotAnt}` : ''; el.className = 'delta neutro'; return; }
+  const dif = modo === 'pp' ? atual - ant : (atual - ant) / ant * 100;
+  const seta = Math.abs(dif) < 0.05 ? '=' : dif > 0 ? '▲' : '▼';
+  const num = Math.abs(dif).toFixed(1).replace('.', ',') + (modo === 'pp' ? ' p.p.' : '%');
+  el.textContent = `${seta} ${seta === '=' ? '' : num + ' '}vs ${rotAnt}`;
+  const bom = melhor && seta !== '=' && ((dif > 0) === (melhor === 'sobe'));
+  el.className = 'delta ' + (!melhor || seta === '=' ? 'neutro' : bom ? 'bom' : 'ruim');
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function render(){
+  const k = $('selPeriodo').value, kAnt = anterior(k);
+  const L = ticketsDe(k);
+  const a = indicadores(L);
+  const b = temDados(kAnt) ? indicadores(ticketsDe(kAnt)) : null;
+  const rotAnt = rotulo(kAnt);
+
+  $('periodoLabel').textContent = `${rotulo(k)}${parcial(k) ? ' (em andamento)' : ''} · por data de abertura · comparado com ${rotulo(kAnt)}`;
+
+  // Tickets
+  $('kTotal').textContent = fmt(a.total);
+  delta($('dTotal'), a.total, b && b.total, 'pct', null, rotAnt);
+  $('kFech').textContent = a.pctFech == null ? '–' : pct(a.fechados, a.total);
+  $('kFechSub').textContent = `${fmt(a.fechados)} de ${fmt(a.total)}`;
+  delta($('dFech'), a.pctFech, b && b.pctFech, 'pp', 'sobe', rotAnt);
+  $('kResp').textContent = fmtH(a.respMed);
+  delta($('dResp'), a.respMed, b && b.respMed, 'tempo', 'desce', rotAnt);
+
+  // Retrato de hoje (base inteira, não depende do período)
+  const bo = D.t.filter(aguardandoBO), sla = bo.filter(alerta).length;
+  $('kBO').textContent = fmt(bo.length);
+  $('kSla').textContent = fmt(sla);
+  $('kSlaSub').textContent = `aguardando BO há mais de ${D.slaH}h`;
+
+  // Volume por mês: 6 meses terminando no fim do período
+  const fim = mesesDoPeriodo(k).filter(m => m <= MES_ATUAL).pop() || MES_ATUAL;
+  const meses = mesesEntre(MES_MIN, fim).slice(-6);
+  const doPeriodo = new Set(mesesDoPeriodo(k));
+  const porMes = new Map(meses.map(m => [m, { f: 0, n: 0 }]));
+  for (const t of D.t){ const c = porMes.get(t[I.AB].slice(0, 7)); if (c) statusKey(t) === 'closed' ? c.f++ : c.n++; }
+  const series = [
+    { label: 'Fechados', cor: 'var(--st-closed)', values: meses.map(m => porMes.get(m).f) },
+    { label: 'Ainda não fechados', cor: 'var(--accent)', values: meses.map(m => porMes.get(m).n) },
+  ];
+  $('volLegend').innerHTML = series.map(s => `<span class="lg"><span class="sw" style="background:${s.cor}"></span>${s.label}</span>`).join('')
+    + '<span class="lg">· em destaque: período selecionado</span>';
+  $('volChart').innerHTML = barChart(meses.map(nomeMes), series, { stacked: true, destaque: meses.map(m => doPeriodo.has(m)) });
+
+  // Top departamentos
+  const dep = new Map();
+  for (const t of L){ const d = deptOf(t), c = dep.get(d) || { n: 0, f: 0 }; c.n++; if (statusKey(t) === 'closed') c.f++; dep.set(d, c); }
+  hbars($('topDept'), [...dep.entries()].sort((x, y) => y[1].n - x[1].n).slice(0, 5)
+    .map(([d, c]) => ({ label: d, valor: c.n, extra: `${pct(c.f, c.n)} fechados` })));
+
+  // Transferências
+  $('tTotal').textContent = fmt(a.transf);
+  $('tTotalSub').textContent = `${pct(a.transf, a.total)} dos tickets`;
+  delta($('dTTotal'), a.transf, b && b.transf, 'pct', 'desce', rotAnt);
+  $('tOutra').textContent = fmt(a.outra);
+  $('tOutraSub').textContent = `${pct(a.outra, a.transf)} das transferências`;
+  delta($('dTOutra'), a.outra, b && b.outra, 'pct', 'desce', rotAnt);
+  $('tMesma').textContent = fmt(a.mesma);
+  $('tMesmaSub').textContent = `${pct(a.mesma, a.transf)} das transferências`;
+  delta($('dTMesma'), a.mesma, b && b.mesma, 'pct', null, rotAnt);
+  $('tTempo').textContent = fmtH(a.transfMed);
+  delta($('dTTempo'), a.transfMed, b && b.transfMed, 'tempo', 'desce', rotAnt);
+
+  const T = L.filter(transferido);
+  const contar = fn => { const m = new Map(); for (const t of T){ const x = fn(t); m.set(x, (m.get(x) || 0) + 1); } return [...m.entries()].sort((p, q) => q[1] - p[1]).slice(0, 5); };
+  const area = i => D.areas[i] || '(sem área)';
+  hbars($('fluxos'), contar(t => `${area(t[I.TR_AREA_DE])} → ${area(t[I.TR_AREA_PARA])}`)
+    .map(([x, n]) => ({ label: x, valor: n, extra: pct(n, T.length) })));
+  hbars($('destinos'), contar(t => area(t[I.TR_AREA_PARA]))
+    .map(([x, n]) => ({ label: x, valor: n, extra: pct(n, T.length), classe: 'acc' })));
+}
+
+function preencherPeriodos(){
+  const tipo = $('selTipo').value, lista = periodosDisponiveis(tipo);
+  $('selPeriodo').innerHTML = lista.map(k => `<option value="${k}">${rotulo(k)}${parcial(k) ? ' (em andamento)' : ''}</option>`).join('');
+  // Padrão: o período fechado mais recente (o atual só se for o único)
+  $('selPeriodo').value = lista.find(k => !parcial(k)) || lista[0];
+}
+
+function mostrarAviso(html){ $('aviso').innerHTML = html; $('aviso').style.display = ''; $('periodoLabel').textContent = ''; }
+
+function init(){
+  if (D && D.versao !== VERSAO_DADOS){ mostrarAviso('Os dados salvos estão num formato antigo. No editor do Apps Script, rode <b>atualizarDados</b> uma vez.'); return; }
+  if (!D || !D.t || !D.t.length){ mostrarAviso('Sem dados ainda. No editor do Apps Script, rode <b>atualizarDados</b> uma vez.'); return; }
+
+  const meses = D.t.map(t => t[I.AB].slice(0, 7)).filter(Boolean).sort();
+  MES_MIN = meses[0]; MES_ATUAL = D.geradoEm.slice(0, 7);
+  $('atualizado').textContent = `Dados atualizados em ${fmtData(D.geradoEm)} · fonte: Metabase`;
+
+  $('selTipo').onchange = () => { preencherPeriodos(); render(); };
+  $('selPeriodo').onchange = render;
+  $('btnImprimir').onclick = () => window.print();
+  preencherPeriodos();
+  $('conteudo').style.display = '';
+  render();
+}
+
+document.documentElement.dataset.theme = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+
+/** gzip + base64 (como salvo pelo Code.gs) -> objeto. */
+async function descompactar(b64){
+  const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return JSON.parse(await new Response(stream).text());
+}
+
+google.script.run
+  .withSuccessHandler(async b64 => {
+    try { D = b64 ? await descompactar(b64) : null; }
+    catch (e) { mostrarAviso('Não foi possível carregar os dados: ' + esc(e.message)); return; }
+    init();
+  })
+  .withFailureHandler(e => mostrarAviso('Não foi possível carregar os dados: ' + esc(e.message || String(e))))
+  .getDados();
+</script>
+</body>
+</html>

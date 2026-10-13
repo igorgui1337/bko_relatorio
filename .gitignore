@@ -22,3 +22,6 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# Copias locais de seguranca (a versao fica na tag do git)
+backups/

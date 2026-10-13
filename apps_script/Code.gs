@@ -70,10 +70,19 @@ const OBRIGATORIAS = ['ticket_id', 'ticket_subject', 'open_at', 'status'];
 /**
  * Serve só a página; os dados vêm depois por getDados(). Assim a tela abre na hora
  * em vez de esperar o Drive + a montagem de ~6 MB de HTML.
+ *   (sem parâmetro)  -> Index.html     painel gerencial
+ *   ?v=diretoria     -> Diretoria.html resumo macro para a diretoria
  */
-function doGet() {
-  return HtmlService.createHtmlOutputFromFile('Index')
-    .setTitle('Tickets · BackOffice')
+function doGet(e) {
+  let pagina;
+  if (e && e.parameter && e.parameter.v === 'diretoria') {
+    const t = HtmlService.createTemplateFromFile('Diretoria');
+    t.urlGerencial = ScriptApp.getService().getUrl();   // link "detalhes no painel gerencial"
+    pagina = t.evaluate().setTitle('Resumo Diretoria · Tickets BackOffice');
+  } else {
+    pagina = HtmlService.createHtmlOutputFromFile('Index').setTitle('Tickets · BackOffice');
+  }
+  return pagina
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
