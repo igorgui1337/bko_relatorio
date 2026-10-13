@@ -69,14 +69,6 @@
   /* Contexto do número (variação contra o período anterior) */
   .delta{font-size:10.5px;font-weight:700;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
   .delta.bom{color:var(--ok)} .delta.ruim{color:var(--danger)} .delta.neutro{color:var(--muted)}
-  /* Quadro de ação: diz o que fazer com os números (canto superior esquerdo, onde o olho começa) */
-  .acao{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--danger);border-radius:10px;
-    padding:10px 14px;margin-bottom:12px;box-shadow:var(--shadow-sm)}
-  .acao.ok{border-left-color:var(--ok)}
-  .acao .acao-rot{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
-  .acao .acao-tit{font-size:15px;font-weight:800;color:var(--ink);margin:2px 0 4px}
-  .acao ul{margin:0;padding-left:18px;font-size:12.5px;color:var(--ink)}
-  .acao li{margin:1px 0}
 
   .card{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:13px 15px 14px;box-shadow:var(--shadow-sm);min-width:0}
   .card h3{margin:0 0 2px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
@@ -146,8 +138,6 @@
       <label for="fAte">até</label><input type="date" id="fAte"/>
       <button class="btn ghost" id="btnAplicar">Buscar</button>
     </div>
-
-    <div class="acao" id="acao"></div>
 
     <div class="card" style="margin-bottom:14px">
       <h3>Por departamento</h3>
@@ -281,38 +271,6 @@ function variacao(el, atual, ant, modo, melhor, rotulo){
   el.className = 'delta ' + (!melhor || igual ? 'neutro' : ((dif > 0) === (melhor === 'sobe') ? 'bom' : 'ruim'));
 }
 
-/**
- * Quadro de ação ("removing information creates room for direction"): em vez de só mostrar
- * números, diz onde agir — o departamento que concentra os atrasos, o atraso mais antigo e o que
- * vence hoje se ninguém responder.
- */
-function acaoAgora(){
-  const porDep = new Map(); let total = 0, maisAntigo = null, venceHoje = 0, bo = 0;
-  for (const t of janela()){
-    if (DEPTO_FORA.has(deptOf(t))) continue;
-    const r = refBO(t); if (!r) continue;
-    bo++;
-    if (!r.atrasado){ if (prazoUtil(r.ref).slice(0, 10) === hoje()) venceHoje++; continue; }
-    total++;
-    const d = porDep.get(deptOf(t)) || { ar: 0, at: 0 };
-    r.motivo === 'transferencia' ? d.at++ : d.ar++;
-    porDep.set(deptOf(t), d);
-    if (!maisAntigo || esperaH(t) > esperaH(maisAntigo)) maisAntigo = t;
-  }
-  const vence = venceHoje ? `${fmt(venceHoje)} ticket${venceHoje > 1 ? 's' : ''} em dia ${venceHoje > 1 ? 'vencem' : 'vence'} hoje se ninguém responder.` : '';
-  if (!total) return { ok: true, titulo: bo ? 'Nenhum ticket em atraso agora.' : 'Nada aguardando o BackOffice agora.',
-                       itens: [bo ? `${fmt(bo)} aguardando o BO, todos dentro de 1 dia útil.` : '', vence].filter(Boolean) };
-  const [dep, d] = [...porDep.entries()].sort((a, b) => (b[1].ar + b[1].at) - (a[1].ar + a[1].at))[0];
-  const partes = [d.ar ? `${fmt(d.ar)} sem resposta` : '', d.at ? `${fmt(d.at)} por transferência` : ''].filter(Boolean).join(' e ');
-  return { ok: false,
-    titulo: `Comece por ${dep}: ${fmt(d.ar + d.at)} dos ${fmt(total)} atrasos (${pct(d.ar + d.at, total)}).`,
-    itens: [
-      `${dep}: ${partes}.`,
-      `Atraso mais antigo: #${maisAntigo[I.TID]} · ${D.assuntos[maisAntigo[I.SUBJ]] || '(sem assunto)'} (${deptOf(maisAntigo)}), esperando há ${fmtH(esperaH(maisAntigo))}.`,
-      vence,
-    ].filter(Boolean) };
-}
-
 /** Números do período (pela abertura) + retrato de agora (tickets da janela de 120 dias). */
 function resumo(){
   const L = doPeriodo();
@@ -383,11 +341,6 @@ function render(){
   $('cAtrResp').textContent = `${pct(r.agora.atrResp, bo)} dos aguardando BO`;
   $('cAtrTransf').textContent = `${pct(r.agora.atrTransf, bo)} dos aguardando BO`;
 
-  // O que fazer agora
-  const ac = acaoAgora();
-  $('acao').className = 'acao' + (ac.ok ? ' ok' : '');
-  $('acao').innerHTML = `<div class="acao-rot">${ac.ok ? '✓ Situação' : '▶ Onde agir agora'}</div>
-    <div class="acao-tit">${esc(ac.titulo)}</div>${ac.itens.length ? `<ul>${ac.itens.map(i => `<li>${esc(i)}</li>`).join('')}</ul>` : ''}`;
 
 
   // Atrasos agora
@@ -445,9 +398,6 @@ function montarRelatorio(){
     <p style="${st.h}"><b>Relatório semanal de tickets · BackOffice</b></p>
     <p style="${st.p}">Semana de ${semana} · dados atualizados em ${fmtData(D.geradoEm).replace(' ', ' às ')} (Metabase).
       SLA de 1 dia útil: vence no mesmo horário do próximo dia útil. Considera tickets abertos desde ${fmtDia(inicioJanela())} (últimos ${JANELA_DIAS} dias).</p>
-    ${(() => { const ac = acaoAgora(); return `<p style="${st.h3}"><b>${ac.ok ? 'Situação' : 'Onde agir agora'}</b></p>
-      <p style="${st.p};margin:0 0 4px"><b>${esc(ac.titulo)}</b></p>
-      ${ac.itens.length ? `<ul style="${st.p};margin:0 0 6px;padding-left:18px">${ac.itens.map(i => `<li>${esc(i)}</li>`).join('')}</ul>` : ''}`; })()}
     <p style="${st.h3}"><b>Resumo da semana</b></p>${tabKpis}
     <p style="${st.h3}"><b>Por departamento</b></p>${tabDep}
     <p style="${st.h3}"><b>Situação por assunto</b></p>${titan}

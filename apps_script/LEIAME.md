@@ -114,7 +114,6 @@ Painel para acompanhar a semana, com link para o painel completo. Pode ser coloc
   - "Agora" (aguardando BO, em dia e atrasos) é o retrato do momento, com o SLA de 1 dia útil.
   - **O painel só considera tickets abertos nos últimos 120 dias** (`JANELA_DIAS` no `Painel.html`), inclusive no relatório semanal; os atrasos mais antigos aparecem só no relatório de atrasos (`?v=diretoria`).
 - **Conteúdo:** de cima para baixo:
-  - **quadro "Onde agir agora"**, com o departamento que concentra os atrasos, o atraso mais antigo e quantos tickets em dia vencem hoje;
   - a tabela por departamento, com a última transferência de assunto;
   - os cartões do período e de agora;
   - os 10 atrasos mais antigos.
@@ -122,7 +121,7 @@ Painel para acompanhar a semana, com link para o painel completo. Pode ser coloc
   - Os cartões do período comparam com o período anterior de mesmo tamanho, **medido no mesmo ponto do tempo**. A última atualização é deslocada para trás pelo mesmo número de dias, para os tickets antigos não ganharem dias a mais para serem respondidos ou fechados. O fechamento é aproximado pela última mensagem.
   - O cartão de abertos mostra os dias úteis e os feriados do período.
   - Os cartões de agora mostram a proporção sobre o total aguardando o BO.
-  - Esses dois ajustes seguem princípios de dashboards da skill `revenue-centric-design`: "informação sem contexto é spam" e "tirar informação abre espaço para direção".
+  - Segue o princípio de dashboards "informação sem contexto é spam", da skill `revenue-centric-design`.
 - **"Gerar relatório semanal":**
   1. Mostra uma prévia em HTML com:
      - o resumo da semana;
