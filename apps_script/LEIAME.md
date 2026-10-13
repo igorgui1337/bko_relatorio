@@ -110,6 +110,7 @@ Painel para acompanhar a semana, com link para o painel completo. Pode ser coloc
 - **Período:**
   - abre na **semana vigente, de segunda a domingo**;
   - ◀ ▶ trocam de semana, e "Buscar" aceita qualquer intervalo dentro dos **últimos 30 dias**;
+  - **filtro de status** (Aberto, Em processo, Pendente, Fechado; dá para marcar mais de um; nenhum marcado = todos) vale para tudo na tela. O relatório semanal ignora o filtro e sai sempre completo;
   - abertos, fechados, 1ª resposta e transferidos usam a data de abertura;
   - "Agora" (aguardando BO, em dia e atrasos) é o retrato do momento, com o SLA de 1 dia útil.
   - **O painel só considera tickets abertos nos últimos 120 dias** (`JANELA_DIAS` no `Painel.html`), inclusive no relatório semanal; os atrasos mais antigos aparecem só no relatório de atrasos (`?v=diretoria`).

@@ -11,7 +11,7 @@
     --ink:#0c2b2b; --muted:#5a6b6a; --border:#dbe4e3;
     --brand:#0b494b; --brand-2:#0f6d70; --brand-3:#13908f; --brand-4:#2bb3b0;
     --accent:#e8a33d; --accent-soft:rgba(232,163,61,.14); --on-brand:#ffffff;
-    --ok:#0b7a5b; --danger:#c0442e; --st-closed:#0b7a5b;
+    --ok:#0b7a5b; --danger:#c0442e; --st-closed:#0b7a5b; --st-open:#c0442e; --st-process:#e8a33d; --st-pending:#0f6d70;
     --shadow-sm:0 1px 2px rgba(11,73,75,.05);
     --font:'Segoe UI',-apple-system,Roboto,Helvetica,Arial,sans-serif;
   }
@@ -21,7 +21,7 @@
       --ink:#e7efee; --muted:#9bb0ae; --border:#1d3a37;
       --brand:#2bb3b0; --brand-2:#38c0bd; --brand-3:#17a3a1; --brand-4:#5fd0cd;
       --accent:#f0b45a; --accent-soft:rgba(240,180,90,.14); --on-brand:#04211f;
-      --ok:#3fc79a; --danger:#e8735b; --st-closed:#3fc79a;
+      --ok:#3fc79a; --danger:#e8735b; --st-closed:#3fc79a; --st-open:#e8735b; --st-process:#f0b45a; --st-pending:#38c0bd;
       --shadow-sm:0 1px 2px rgba(0,0,0,.35);
     }
   }
@@ -53,6 +53,12 @@
   .periodo .seta{padding:5px 10px}
   .periodo .sep{width:1px;height:22px;background:var(--border);margin:0 4px}
   .periodo label{font-size:11px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  .pills{display:inline-flex;gap:5px;flex-wrap:wrap}
+  .pill{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;font-size:11.5px;font-weight:600;border-radius:999px;
+    border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-family:var(--font)}
+  .pill:hover{border-color:var(--brand-3);color:var(--ink)}
+  .pill.on{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}
+  .pill .dot{width:7px;height:7px;border-radius:50%}
   input[type="date"]{padding:5px 7px;font-size:12px;font-family:var(--font);background:var(--surface);color:var(--ink);
     border:1px solid var(--border);border-radius:6px}
 
@@ -137,6 +143,8 @@
       <label for="fDe">De</label><input type="date" id="fDe"/>
       <label for="fAte">até</label><input type="date" id="fAte"/>
       <button class="btn ghost" id="btnAplicar">Buscar</button>
+      <span class="sep"></span>
+      <label>Status</label><span class="pills" id="fStatus"></span>
     </div>
 
     <div class="card" style="margin-bottom:14px">
@@ -218,11 +226,21 @@ function irParaSemana(seg){ periodo.de = seg; periodo.ate = somaDias(seg, 6); pe
 
 // ── Cálculos ───────────────────────────────────────────────────────────────
 const inicioJanela = () => somaDias(hoje(), -(JANELA_DIAS - 1));
-/** Tickets que o painel considera: abertos nos últimos JANELA_DIAS dias (fica fora o histórico de 2025). */
-let _janela = null, _janelaDe = '';
+/** Filtro de status da tela (vazio = todos). O relatório semanal ignora o filtro: sai sempre completo. */
+const filtroStatus = new Set();
+let usarFiltro = true;
+const ST_LABEL = { open: 'Aberto', processing: 'Em processo', pending: 'Pendente', closed: 'Fechado' };
+const ST_COR = { open: 'var(--st-open)', processing: 'var(--st-process)', pending: 'var(--st-pending)', closed: 'var(--st-closed)' };
+
+/** Tickets que o painel considera: abertos nos últimos JANELA_DIAS dias (fica fora o histórico de 2025) e no status filtrado. */
+let _janela = null, _janelaChave = '';
 function janela(){
-  const de = inicioJanela();
-  if (_janelaDe !== de || !_janela || _janela.D !== D){ _janela = D.t.filter(t => t[I.AB].slice(0, 10) >= de); _janela.D = D; _janelaDe = de; }
+  const de = inicioJanela(), sts = usarFiltro ? [...filtroStatus].sort().join(',') : '';
+  const chave = de + '|' + sts;
+  if (_janelaChave !== chave || !_janela || _janela.D !== D){
+    _janela = D.t.filter(t => t[I.AB].slice(0, 10) >= de && (!sts || filtroStatus.has(statusKey(t))));
+    _janela.D = D; _janelaChave = chave;
+  }
   return _janela;
 }
 const doIntervalo = (de, ate) => janela().filter(t => { const d = t[I.AB].slice(0, 10); return d >= de && d <= ate; });
@@ -317,14 +335,15 @@ const porDepartamento = L => agrupar(L, false);
 function render(){
   const ehAtual = periodo.semana && periodo.de === segunda(hoje());
   $('rotuloPeriodo').textContent = (periodo.semana ? `Semana de ${rotuloPeriodo()}` : rotuloPeriodo()) + (ehAtual ? ' · atual' : '');
-  $('secPeriodo').textContent = `No período · tickets abertos de ${rotuloPeriodo()}`;
+  const filtro = filtroStatus.size ? ` · status: ${[...filtroStatus].map(st => ST_LABEL[st] || st).join(', ')}` : '';
+  $('secPeriodo').textContent = `No período · tickets abertos de ${rotuloPeriodo()}${filtro}`;
   $('btnProx').disabled = !periodo.semana || periodo.ate >= hoje();
   $('btnAnt').disabled = !periodo.semana || periodo.de <= limiteBusca();
   $('fDe').value = periodo.de; $('fAte').value = periodo.ate;
   $('fDe').min = $('fAte').min = limiteBusca(); $('fDe').max = $('fAte').max = hoje();
 
   const r = resumo();
-  $('secAgora').textContent = `Agora · tickets abertos desde ${fmtDia(inicioJanela())} (últimos ${JANELA_DIAS} dias) aguardando o BackOffice`;
+  $('secAgora').textContent = `Agora · tickets abertos desde ${fmtDia(inicioJanela())} (últimos ${JANELA_DIAS} dias) aguardando o BackOffice${filtro}`;
   $('subDepto').textContent = `abertos e 1ª resposta no período · em dia, atrasos e últ. transferência de agora (tickets desde ${fmtDia(inicioJanela())})`;
   $('kAbertos').textContent = fmt(r.abertos);
   // Feriados no período explicam quedas de volume (ex.: 12/10) — contexto para não ler como melhora/piora
@@ -428,7 +447,8 @@ function montarRelatorio(){
 }
 
 function abrirRelatorio(){
-  RELATORIO = montarRelatorio();
+  usarFiltro = false;   // relatório oficial: sempre completo, independentemente do filtro da tela
+  try { RELATORIO = montarRelatorio(); } finally { usarFiltro = true; }
   $('previa').innerHTML = RELATORIO.html;
   $('modalInfo').innerHTML = `Assunto: <b>${esc(RELATORIO.assunto)}</b> · Para: <b>${esc(CONFIG.destinatarios || '(defina RELATORIO_DESTINATARIOS nas propriedades do script)')}</b><br>
     Ao clicar em <b>Copiar e abrir e-mail</b>, o relatório é copiado e um e-mail novo abre no Gmail: é só colar (Ctrl+V) no corpo e enviar.`;
@@ -487,6 +507,12 @@ function init(dados){
   $('btnAnt').onclick = () => irParaSemana(somaDias(periodo.de, -7));
   $('btnProx').onclick = () => irParaSemana(somaDias(periodo.de, 7));
   $('btnAtual').onclick = () => irParaSemana(segunda(hoje()));
+  for (const st of D.statusOrdem){
+    const b = document.createElement('button'); b.className = 'pill'; b.dataset.s = st;
+    b.innerHTML = `<span class="dot" style="background:${ST_COR[st] || 'var(--muted)'}"></span>${esc(ST_LABEL[st] || st)}`;
+    b.onclick = () => { filtroStatus.has(st) ? filtroStatus.delete(st) : filtroStatus.add(st); b.classList.toggle('on', filtroStatus.has(st)); render(); };
+    $('fStatus').appendChild(b);
+  }
   $('btnAplicar').onclick = () => {
     let de = $('fDe').value || limiteBusca(), ate = $('fAte').value || hoje();
     if (de < limiteBusca()) de = limiteBusca();
