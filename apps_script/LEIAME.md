@@ -59,6 +59,7 @@ Ele mostra a versão, os parâmetros, o SQL, as colunas e as primeiras linhas, e
    - `METABASE_USER` e `METABASE_PASSWORD`, ou `METABASE_API_KEY`. A chave de API é melhor, porque não depende da senha de uma pessoa.
    - `METABASE_DATA_INICIO` (opcional): primeira data de abertura, no formato `yyyy-MM-dd`. O padrão é 1º de janeiro do ano atual; prefira fixar `2026-01-01`.
    - `RELATORIO_DESTINATARIOS`: e-mails do relatório semanal, separados por vírgula.
+   - `SITE_URL_PAINEL` e `SITE_URL_COMPLETO` (opcionais): endereços das páginas do Google Sites onde o Painel e o painel completo estão incorporados. Com eles, os links "Ver painel completo" / "← Painel" (e os do relatório semanal) levam à página do Sites; sem eles, ao `/exec`. Dentro do Sites o quadro incorporado não consegue trocar de página sozinho, por isso os links usam `target="_top"`.
    - `RELATORIO_ASSUNTO` (opcional): assunto do e-mail; `{semana}` vira o período.
 4. No editor, rode `testarConexao` e autorize. O log mostra as colunas recebidas.
 5. Rode `atualizarDados`. Na primeira vez, sem dados salvos, ele faz a carga completa. Rode `atualizarHistorico` uma vez para trazer os atrasos antigos (~3 min). Depois rode `instalarGatilho`, que cria os gatilhos de 30 min, das 7h e de domingo.

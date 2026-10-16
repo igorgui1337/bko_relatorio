@@ -102,9 +102,12 @@ function doGet(e) {
   const v = e && e.parameter && e.parameter.v;
   const [arquivo, titulo] = Object.prototype.hasOwnProperty.call(PAGINAS, v) ? PAGINAS[v] : PAGINA_PRINCIPAL;
   const url = ScriptApp.getService().getUrl();
+  // Dentro do Google Sites os links abrem a página do Sites (propriedades SITE_URL_*), não o /exec:
+  // o quadro incorporado não pode trocar de página sozinho. Sem as propriedades, usa o /exec.
+  const props = PropertiesService.getScriptProperties();
   return montarPagina_(arquivo, {
-    URL_PAINEL: url,                        // link "voltar ao painel"
-    URL_COMPLETO: url + '?v=completo',      // link "ver painel completo"
+    URL_PAINEL: props.getProperty('SITE_URL_PAINEL') || url,                       // link "voltar ao painel"
+    URL_COMPLETO: props.getProperty('SITE_URL_COMPLETO') || url + '?v=completo',   // link "ver painel completo"
   })
     .setTitle(titulo)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
