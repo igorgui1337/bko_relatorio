@@ -115,7 +115,7 @@
   .previa{background:#f4f7f6;color:#000;margin:12px 16px 16px;border:1px solid var(--border);border-radius:8px;padding:0;overflow:auto;max-height:70vh}
 </style>
 </head>
-<body data-url-completo="<?= urlGerencial ?>" data-url-painel="<?= urlPainel ?>">
+<body data-url-completo="@@URL_COMPLETO@@" data-url-painel="@@URL_PAINEL@@">
 <div class="pagina">
   <header class="topo">
     <svg class="logo" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 46 23" role="img" aria-label="W1"><path fill="currentColor" d="M28.8999 5.55113H36.0169L22.3504 22.7286L17.0917 22.7244C15.527 22.7244 14.2587 21.4574 14.2587 19.8947V14.4496L7.67968 22.7286H3.09095C1.52486 22.7286 0.255127 21.4616 0.255127 19.8989V5.55113H5.94364V16.0138L14.2587 5.55113H19.9303V16.8365L28.8999 5.55113ZM45.7955 3.04654C45.7955 1.48381 44.5258 0.216797 42.9597 0.216797H33.1375L30.6149 3.39133H37.722V22.7272H45.7955V3.04654Z"></path></svg>
@@ -126,7 +126,7 @@
     </div>
     <div class="acoes">
       <button class="btn" id="btnRelatorio" disabled>Gerar relatório semanal</button>
-      <a class="btn ghost" href="<?= urlGerencial ?>" title="Painel completo com todos os detalhes">Ver painel completo →</a>
+      <a class="btn ghost" href="@@URL_COMPLETO@@" title="Painel completo com todos os detalhes">Ver painel completo →</a>
     </div>
   </header>
 
@@ -178,7 +178,7 @@
 
     <div class="rodape">
       <span>SLA de 1 dia útil: vence no mesmo horário do próximo dia útil (fins de semana e feriados nacionais não contam).</span>
-      <span>Detalhes por ticket, analista e escritório no <a href="<?= urlGerencial ?>">painel completo</a></span>
+      <span>Detalhes por ticket, analista e escritório no <a href="@@URL_COMPLETO@@">painel completo</a></span>
     </div>
   </div>
 </div>
@@ -198,8 +198,8 @@
   </div>
 </div>
 
-<?!= include('Regras') ?>
-<?!= include('Relatorio') ?>
+@@INCLUDE:Regras@@
+@@INCLUDE:Relatorio@@
 <script>
 // ═════════════════════════════════════════════════════════════════════════════
 // Painel de tempo real — semana vigente (seg–dom), busca nos últimos 30 dias,
@@ -210,8 +210,8 @@ let CONFIG = { destinatarios: '', assunto: 'Relatório semanal de tickets · Bac
 const DIAS_BUSCA = 30;               // busca personalizada: últimos 30 dias
 const JANELA_DIAS = 120;             // o painel só considera tickets abertos nos últimos 120 dias
 const RECARREGAR_MS = 10 * 60000;    // com a página aberta, busca dados novos a cada 10 min
-// Links vêm de atributos do <body>: dentro de <script> o Apps Script imprime os valores do template
-// já entre aspas (escape contextual de JavaScript), o que quebrava a página inteira no Google.
+// Links vêm de atributos do <body> (o Code.gs troca os marcadores @@URL_...@@ ao montar a página).
+// Sem barras invertidas no JavaScript destas páginas: o HtmlService as interpreta ao ler o arquivo.
 const URL_COMPLETO = document.body.dataset.urlCompleto || '';
 const URL_PAINEL = document.body.dataset.urlPainel || '';
 const periodo = { de: '', ate: '', semana: true };
@@ -496,7 +496,7 @@ function montarRelatorio(){
   const texto = [`Relatório semanal de tickets · BackOffice — semana de ${semana}`,
     `Abertos: ${fmt(r.abertos)} · Fechados: ${fmt(r.fechados)} (${pct(r.fechados, r.abertos)}) · 1ª resposta (mediana): ${fmtH(r.resp)} · Transferidos: ${fmt(r.transf)}`,
     `Agora: ${fmt(bo)} aguardando BO · ${fmt(r.agora.emDia)} em dia · ${fmt(r.agora.atrResp)} atraso sem resposta · ${fmt(r.agora.atrTransf)} atraso por transferência`,
-    URL_PAINEL ? `Painel: ${URL_PAINEL}` : '', URL_COMPLETO ? `Painel completo: ${URL_COMPLETO}` : ''].filter(Boolean).join('\n');
+    URL_PAINEL ? `Painel: ${URL_PAINEL}` : '', URL_COMPLETO ? `Painel completo: ${URL_COMPLETO}` : ''].filter(Boolean).join(String.fromCharCode(10));
   return {
     html, texto, assunto: CONFIG.assunto.replace('{semana}', semana),
     resumo: { inicio: periodo.de, fim: periodo.ate, abertos: r.abertos, fechados: r.fechados,

@@ -47,9 +47,9 @@ window.google = { script: { get run(){
 
 def montar(nome: str) -> str:
     html = (PASTA / f"{nome}.html").read_text(encoding="utf-8")
-    html = re.sub(r"<\?!=\s*include\('(\w+)'\)\s*\?>",
+    html = re.sub(r"@@INCLUDE:(\w+)@@",
                   lambda m: (PASTA / f"{m.group(1)}.html").read_text(encoding="utf-8"), html)
-    html = html.replace("<?= urlGerencial ?>", "/index").replace("<?= urlPainel ?>", "/painel")
+    html = html.replace("@@URL_COMPLETO@@", "/index").replace("@@URL_PAINEL@@", "/painel")
     return html.replace("<head>", "<head>\n" + STUB, 1)
 
 

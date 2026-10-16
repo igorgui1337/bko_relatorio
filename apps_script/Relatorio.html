@@ -101,7 +101,8 @@ function tabelaParaEmail(tabela, estilo){
 
 /** Tabela como texto separado por tab (colar no Excel). */
 const tabelaParaTexto = tabela => [...tabela.querySelectorAll('tr')]
-  .map(tr => [...tr.children].map(c => c.innerText.replace(/\n/g, ' ')).join('\t')).join('\n');
+  // sem barras invertidas (o HtmlService as interpreta): 10 = quebra de linha, 9 = tab
+  .map(tr => [...tr.children].map(c => c.innerText.split(String.fromCharCode(10)).join(' ')).join(String.fromCharCode(9))).join(String.fromCharCode(10));
 
 /**
  * Copia HTML + texto para a área de transferência. O iframe do Apps Script pode bloquear a

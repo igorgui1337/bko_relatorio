@@ -218,7 +218,7 @@
         <div class="period" id="periodLabel"></div>
       </div>
       <div class="head-actions">
-        <a class="btn btn-ghost" href="<?= urlPainel ?>" title="Voltar ao painel principal" style="text-decoration:none">← Painel</a>
+        <a class="btn btn-ghost" href="@@URL_PAINEL@@" title="Voltar ao painel principal" style="text-decoration:none">← Painel</a>
         <div class="tabs" id="tabs">
           <button data-tab="geral" class="on">Visão geral</button>
           <button data-tab="sla">SLA</button>
@@ -415,7 +415,7 @@
   </main>
 </div>
 
-<?!= include('Regras') ?>
+@@INCLUDE:Regras@@
 <script>
 // ═════════════════════════════════════════════════════════════════════════════
 // Dados gerados pelo Code.gs (atualizarDados), carregados por getDados() depois
@@ -433,7 +433,7 @@ const PALETA   = ['var(--c1)','var(--c2)','var(--c3)','var(--c4)','var(--c5)','v
 const filaDe = t => aguardandoBO(t) ? FILA_BO : aguardandoCons(t) ? FILA_CONS : 0;
 
 function corDe(nome){ let h = 0; for (const c of nome) h = (h * 31 + c.charCodeAt(0)) >>> 0; return PALETA[h % PALETA.length]; }
-function iniciais(nome){ const p = nome.trim().split(/\s+/); return ((p[0]||'')[0] + ((p[1]||'')[0] || '')).toUpperCase(); }
+function iniciais(nome){ const p = nome.trim().split(' ').filter(Boolean); return ((p[0]||'')[0] + ((p[1]||'')[0] || '')).toUpperCase(); }
 
 function diasEntre(from, to){
   const out = []; let d = new Date(from + 'T00:00:00Z'); const fim = new Date(to + 'T00:00:00Z');

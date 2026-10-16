@@ -103,32 +103,32 @@ function doGet(e) {
   const [arquivo, titulo] = Object.prototype.hasOwnProperty.call(PAGINAS, v) ? PAGINAS[v] : PAGINA_PRINCIPAL;
   const url = ScriptApp.getService().getUrl();
   return montarPagina_(arquivo, {
-    urlPainel: url,                         // link "voltar ao painel"
-    urlGerencial: url + '?v=completo',      // link "ver painel completo"
+    URL_PAINEL: url,                        // link "voltar ao painel"
+    URL_COMPLETO: url + '?v=completo',      // link "ver painel completo"
   })
     .setTitle(titulo)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-/** Conteúdo de outro arquivo HTML do projeto, para <?!= include('Regras') ?> nas páginas. */
+/** Conteúdo de outro arquivo HTML do projeto (marcador @@INCLUDE:Nome@@ nas páginas). */
 function include(nome) {
   return HtmlService.createHtmlOutputFromFile(nome).getContent();
 }
 
 /**
- * Monta a página sem o motor de template do HtmlService: lê o arquivo como está, encaixa os
- * include('X') e troca os marcadores de link (só em atributos HTML, escapados).
- * O template (createTemplateFromFile) interpretava as barras invertidas do JavaScript —
- * .join('
-') virava uma quebra de linha real e a página inteira parava com SyntaxError.
+ * Monta a página sem o motor de template do HtmlService: lê o arquivo, encaixa os marcadores
+ * @@INCLUDE:Nome@@ e troca @@URL_...@@ (usados só em atributos HTML, valores escapados).
+ * Por que não os scriptlets do HtmlService: ele escapa esses marcadores ao ler o arquivo
+ * (aparecem como texto na página) e interpreta as barras invertidas do JavaScript (a sequência
+ * barra+n virava quebra de linha real -> SyntaxError). Regra: as páginas não usam barra invertida no JS.
  * É a mesma montagem do dev_server.py, então o preview local fica igual ao Google.
  */
 function montarPagina_(arquivo, vars) {
   const escapar = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const html = HtmlService.createHtmlOutputFromFile(arquivo).getContent()
-    .replace(/<\?!=\s*include\('(\w+)'\)\s*\?>/g, (_, nome) => include(nome))
-    .replace(/<\?=\s*(\w+)\s*\?>/g, (_, chave) => escapar(vars[chave] == null ? '' : vars[chave]));
+    .replace(/@@INCLUDE:(\w+)@@/g, (_, nome) => include(nome))
+    .replace(/@@(URL_\w+)@@/g, (_, chave) => escapar(vars[chave] == null ? '' : vars[chave]));
   return HtmlService.createHtmlOutput(html);
 }
 

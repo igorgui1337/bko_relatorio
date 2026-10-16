@@ -88,7 +88,7 @@
       <span class="copiado" id="copiado"></span>
       <button class="btn" id="btnCopiar" title="Copia a tabela para colar no e-mail ou no Excel">Copiar tabela</button>
       <button class="btn ghost" id="btnImprimir" title="Imprimir ou salvar em PDF">Imprimir / PDF</button>
-      <a class="btn ghost" href="<?= urlGerencial ?>" title="Abre o painel gerencial com todos os detalhes">Ver painel completo →</a>
+      <a class="btn ghost" href="@@URL_COMPLETO@@" title="Abre o painel gerencial com todos os detalhes">Ver painel completo →</a>
     </div>
   </header>
 
@@ -113,13 +113,13 @@
 
     <div class="rodape">
       <span id="atualizado"></span>
-      <span>Detalhes por ticket, analista e escritório no <a href="<?= urlGerencial ?>">painel completo</a></span>
+      <span>Detalhes por ticket, analista e escritório no <a href="@@URL_COMPLETO@@">painel completo</a></span>
     </div>
   </div>
 </div>
 
-<?!= include('Regras') ?>
-<?!= include('Relatorio') ?>
+@@INCLUDE:Regras@@
+@@INCLUDE:Relatorio@@
 <script>
 // ═════════════════════════════════════════════════════════════════════════════
 // Relatório de tickets em atraso — mesmo formato do relatório do Titan, por assunto.
