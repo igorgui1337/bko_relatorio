@@ -27,7 +27,12 @@ To verify `Code.gs` changes, run it in Node with a `vm` context that stubs `Util
 - **Fetch:** `conectarMetabase_` logs in (`METABASE_API_KEY` or user/password from Script Properties) and reads the card's template tags. `baixarMetabaseCsv_` POSTs `/api/card/274/query/csv` with `start_date`/`final_date` (text, `yyyy-MM-dd`, filtering on ticket **open date**). It fetches **one month per request**, because the `ticket_message` column makes a month ~10 MB and UrlFetch caps responses at 50 MB.
 - **Incremental update:** `atualizarDados()` (trigger every 30 min) refetches the last `JANELA_DIAS` (60) days and replaces those tickets in the stored payload, keeping older ones. `cargaCompleta()` (Sunday 5h) refetches everything since `METABASE_DATA_INICIO`. All writers go through `comTrava_` (`LockService`), so concurrent triggers skip instead of overwriting. Because the filter is on open date, a ticket always lands entirely in one month or window. Older open tickets only get status changes via `cargaCompleta`.
 - **Consolidation** (`agrupar_` → `consolidar_`, ported from the legacy `processador_relatorio_data.consolidate`): N message rows become one record per ticket. Status priority is `closed > processing > open`. Key business rules:
-  - First response = first message with `sender_type = Admin`. Do **not** use `answered_at`: it is `it.updated_at` in the SQL.
+  - First response time (`tResp`, **business hours**, via `horasUteis_`):
+    - if the consultant opened the ticket: the first Admin message after the open time;
+    - if BO opened it (`issuer_type = Admin`): the first Admin message after the consultant's first message, measured from that message;
+    - if the consultant never wrote, there is no value.
+
+    Otherwise BO-opened tickets count as 0 min: they are 16% of 2026, and including them understated the mean from 32h to 27h. Do **not** use `answered_at`: it is `it.updated_at` in the SQL. `tProc` stays in calendar hours.
   - `fila` (server, `FILA`): for non-closed tickets, `TRANSFERENCIA` (3) when the subject transfer is later than the last message. This is compared on the **raw timestamps with seconds**, because BO often replies and transfers within the same minute. Otherwise, a last message from Admin means `CONSULTOR` (2), else `BO` (1).
   - Client rules live in `Regras.html` (`refBO`). `fila` 3 means aguardando BO with reason "transferência", and its clock starts at the transfer; `fila` 1 means reason "resposta". The SLA is **1 business day**: due at the same time on the next business day, skipping weekends and national holidays (`FERIADOS_FIXOS` plus Good Friday). It is never 24 running hours. `aguardandoBO_` in `Code.gs` mirrors this rule for the history filter.
   - Analyst = last Admin sender.

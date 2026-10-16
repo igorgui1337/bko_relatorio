@@ -132,6 +132,14 @@ Painel para acompanhar a semana, com link para o painel completo. Pode ser coloc
   2. "Copiar e abrir e-mail" copia o relatório e abre um e-mail novo no Gmail, já com destinatários e assunto (`RELATORIO_DESTINATARIOS` e `RELATORIO_ASSUNTO`). É só colar (Ctrl+V) e enviar.
   3. Grava a semana na planilha **"BKO · Histórico semanal de tickets"**: uma linha por semana; gerar de novo atualiza a linha. A planilha é criada na primeira vez, e o id fica em `HISTORICO_SHEET_ID`.
 
+## Tempo de resposta (desde 16/10/2026)
+
+- É medido em **horas úteis**: sábados, domingos e feriados nacionais não contam, com a mesma regra do SLA.
+- **Ticket aberto pelo consultor:** vai da abertura até a 1ª mensagem do BO.
+- **Ticket aberto pelo próprio BO:** vai da 1ª mensagem do consultor até a 1ª resposta do BO depois dela. Sem mensagem do consultor, o ticket fica sem tempo de resposta.
+- Antes, os tickets abertos pelo BO entravam como 0 min. Em 2026 eram 16% dos tickets, e isso subestimava a média (27,1h em vez de 32,0h corridas). A apuração completa está em `apuracao_tempo_resposta_2026.md`.
+- Em 2026, em horas úteis: média de 21,8h, mediana de 18,2h, e 80% respondidos em até 1 dia útil.
+
 ## Observações
 
 - "Agora" é o horário da última atualização. Os tickets abertos/em processo envelhecem a cada execução do gatilho, e não em tempo real.

@@ -316,15 +316,15 @@
 
       <div class="kpis">
         <div class="kpi"><div class="kpi-label">Respondidos</div><div class="kpi-value" id="rTotal">–</div><div class="kpi-sub">com 1ª resposta registrada</div></div>
-        <div class="kpi k-acc"><div class="kpi-label">Tempo médio de resposta</div><div class="kpi-value" id="rMedia">–</div><div class="kpi-sub">abertura → 1ª resposta</div></div>
-        <div class="kpi"><div class="kpi-label">Mediana</div><div class="kpi-value" id="rMediana">–</div><div class="kpi-sub">metade responde em até</div></div>
-        <div class="kpi k-ok"><div class="kpi-label">Respondidos em até 10h</div><div class="kpi-value" id="rPct">–</div><div class="kpi-sub" id="rPctSub"></div></div>
+        <div class="kpi k-acc"><div class="kpi-label">Tempo médio de resposta</div><div class="kpi-value" id="rMedia">–</div><div class="kpi-sub">horas úteis · consultor → 1ª resposta do BO</div></div>
+        <div class="kpi"><div class="kpi-label">Mediana</div><div class="kpi-value" id="rMediana">–</div><div class="kpi-sub">horas úteis · metade responde em até</div></div>
+        <div class="kpi k-ok"><div class="kpi-label">Respondidos em até 10h úteis</div><div class="kpi-value" id="rPct">–</div><div class="kpi-sub" id="rPctSub"></div></div>
       </div>
 
       <div class="grid">
         <div class="card">
           <h3>Tempo médio de resposta por período</h3>
-          <div class="card-sub">horas entre abertura e 1ª resposta, pela data de abertura</div>
+          <div class="card-sub">horas úteis entre a mensagem do consultor e a 1ª resposta do BO, pela data de abertura</div>
           <div id="respChart"></div>
         </div>
         <div class="card">
@@ -334,7 +334,7 @@
         </div>
         <div class="card wide">
           <div class="card-head"><h3>Respostas mais lentas</h3><select class="limite" data-k="tblLentas" title="Quantos itens mostrar"><option value="10">10 primeiros</option><option value="25">25 primeiros</option><option value="50">50 primeiros</option><option value="100">100 primeiros</option><option value="500">500 primeiros</option></select></div>
-          <div class="card-sub">tickets com maior tempo até a 1ª resposta</div>
+          <div class="card-sub">tickets com maior tempo até a 1ª resposta (horas úteis)</div>
           <div class="tbl-wrap"><table id="tblLentas"></table></div>
         </div>
       </div>
@@ -620,9 +620,9 @@ function renderSla(L){
   $('rPctSub').textContent = `${fmt(ate10)} de ${fmt(tempos.length)}`;
 
   hbars($('faixas'), [
-    { label: 'Até 10h', valor: ate10, extra: pct(ate10, tempos.length), classe: '' },
-    { label: 'De 10h a 24h', valor: ate24, extra: pct(ate24, tempos.length), classe: 'acc' },
-    { label: 'Acima de 24h', valor: tempos.length - ate10 - ate24, extra: pct(tempos.length - ate10 - ate24, tempos.length), classe: 'bad' },
+    { label: 'Até 10h úteis', valor: ate10, extra: pct(ate10, tempos.length), classe: '' },
+    { label: 'De 10h a 24h úteis (1 dia útil)', valor: ate24, extra: pct(ate24, tempos.length), classe: 'acc' },
+    { label: 'Acima de 1 dia útil', valor: tempos.length - ate10 - ate24, extra: pct(tempos.length - ate10 - ate24, tempos.length), classe: 'bad' },
   ], { estatico: true });
 
   const g = granEfetiva(), buckets = listaBuckets(g), idx = new Map(buckets.map((b, i) => [b, i]));
@@ -630,11 +630,11 @@ function renderSla(L){
   for (const t of resp){ const i = idx.get(bucketKey(t[I.AB].slice(0, 10), g)); if (i != null) soma[i].push(t[I.TRESP]); }
   $('respChart').innerHTML = barChart(buckets.map(b => bucketLabel(b, g)),
     [{ label: 'Tempo médio (h)', cor: 'var(--brand-3)', values: soma.map(a => +(media(a) || 0).toFixed(1)) }],
-    { refLine: D.slaH, fmtV: v => fmtH(v) });
+    { refLine: D.slaH, refLabel: '1 dia útil', fmtV: v => fmtH(v) });
 
   const lentas = limitar('tblLentas', resp.slice().sort((x, y) => y[I.TRESP] - x[I.TRESP]));
   tabela($('tblLentas'),
-    ['Ticket', 'Assunto', 'Status', 'Abertura', '1ª resposta', 'Tempo', 'Analista', 'Escritório'],
+    ['Ticket', 'Assunto', 'Status', 'Abertura', '1ª resposta', 'Tempo (h úteis)', 'Analista', 'Escritório'],
     lentas.map(t => ({ cells: [
       '#' + t[I.TID], { txt: D.assuntos[t[I.SUBJ]] }, { html: badge(statusKey(t)) },
       fmtData(t[I.AB]), fmtData(t[I.RESP]),
@@ -696,7 +696,7 @@ function renderGrupos(L){
   const dep = agruparPor(L, deptOf);
   const maxD = Math.max(1, ...dep.map(d => d.a.total));
   tabela($('tblDept'),
-    ['Departamento', 'Tickets', 'Fechados', '% fechado', 'Aguardando BO', 'Aguard. consultor', 'SLA alerta', 'TM resposta', 'TM processo', 'Transferidos', '% transf.', 'Trocas de resp.'],
+    ['Departamento', 'Tickets', 'Fechados', '% fechado', 'Aguardando BO', 'Aguard. consultor', 'SLA alerta', 'TM resposta (h úteis)', 'TM processo', 'Transferidos', '% transf.', 'Trocas de resp.'],
     dep.map(d => ({
       sel: state.dept === d.k,
       onClick: () => { state.dept = state.dept === d.k ? '' : d.k; sincronizarControles(); render(); },
@@ -708,7 +708,7 @@ function renderGrupos(L){
   const es = agruparPor(L, t => t[I.ESC]);
   const maxE = Math.max(1, ...es.map(d => d.a.total));
   tabela($('tblEsc'),
-    ['Escritório', 'Tickets', 'Fechados', '% fechado', 'Pendentes', '% pendente', 'SLA alerta', 'TM resposta', 'Mín', 'Máx', 'TM processo'],
+    ['Escritório', 'Tickets', 'Fechados', '% fechado', 'Pendentes', '% pendente', 'SLA alerta', 'TM resposta (h úteis)', 'Mín', 'Máx', 'TM processo'],
     limitar('tblEsc', es).map(d => {
       const pend = d.a.total - d.a.fechados;
       return {
@@ -724,7 +724,7 @@ function renderGrupos(L){
   const an = agruparPor(L, t => t[I.AN]);
   const maxA = Math.max(1, ...an.map(d => d.a.total));
   tabela($('tblAn'),
-    ['Analista', 'Tickets', 'Fechados', '% fechado', 'Aguardando BO', 'Aguard. consultor', 'SLA alerta', 'TM resposta', 'Transferidos', 'Trocas de resp.'],
+    ['Analista', 'Tickets', 'Fechados', '% fechado', 'Aguardando BO', 'Aguard. consultor', 'SLA alerta', 'TM resposta (h úteis)', 'Transferidos', 'Trocas de resp.'],
     limitar('tblAn', an).map(d => {
       const nome = D.analistas[d.k] || '(sem analista)';
       return {
@@ -793,7 +793,7 @@ function barChart(labels, series, opt = {}){
   });
   if (opt.refLine && opt.refLine <= max){
     s += `<line x1="${pl}" x2="${W - pr}" y1="${y(opt.refLine)}" y2="${y(opt.refLine)}" stroke="var(--danger)" stroke-dasharray="4 4"/>`;
-    s += `<text class="axis" x="${W - pr}" y="${y(opt.refLine) - 4}" text-anchor="end" style="fill:var(--danger)">SLA ${opt.refLine}h</text>`;
+    s += `<text class="axis" x="${W - pr}" y="${y(opt.refLine) - 4}" text-anchor="end" style="fill:var(--danger)">${opt.refLabel || 'SLA ' + opt.refLine + 'h'}</text>`;
   }
   return s + '</svg>';
 }

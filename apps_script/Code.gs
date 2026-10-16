@@ -41,7 +41,7 @@ const HISTORICO_PADRAO = '2023-01-01';
 const HISTORICO_ORCAMENTO_MS = 150 * 1000;
 const ARQUIVO_DADOS = 'bko_dashboard_dados.json.gz.b64';
 // Sobe quando o formato do JSON muda; dados salvos em outra versão forçam carga completa.
-const VERSAO_DADOS = 3;
+const VERSAO_DADOS = 4;
 
 // Com quem está o ticket não fechado, pela última mensagem
 // TRANSFERENCIA: transferido de assunto depois da última mensagem (comparado com segundos,
@@ -66,6 +66,7 @@ const COLUNAS = {
   previous_sender_id: ['previous_sender_id', 'previous sender id'],
   sender:             ['sender'],
   sender_type:        ['sender_type'],
+  issuer_type:        ['issuer_type'],
   consultant:         ['consultant'],
   office:             ['office'],
   // Última transferência de assunto do ticket (mesmo valor em todas as linhas do ticket)
@@ -341,6 +342,7 @@ function agrupar_(linhas, grupos) {
       psid:     normId_(v(row, 'previous_sender_id')),
       sender:   v(row, 'sender'),
       tipo:     v(row, 'sender_type'),
+      emissor:  v(row, 'issuer_type'),
       consult:  v(row, 'consultant'),
       office:   v(row, 'office'),
     };
@@ -371,11 +373,26 @@ function consolidar_(grupos, agora) {
       || (a.msgBruta < b.msgBruta ? -1 : a.msgBruta > b.msgBruta ? 1 : 0));   // mesmo minuto: pelos segundos
 
     // answered_at do Metabase é it.updated_at (última atualização), não a 1ª resposta.
-    // A 1ª resposta é a primeira mensagem do BackOffice (sender_type = Admin).
+    // 1ª resposta = primeira mensagem do BackOffice (sender_type = Admin) que responde ao consultor:
+    //   ticket aberto pelo consultor -> 1ª msg do BO, contada da abertura;
+    //   ticket aberto pelo próprio BO (issuer_type = Admin) -> 1ª msg do BO DEPOIS da 1ª msg do
+    //   consultor, contada dessa msg do consultor (senão a abertura do BO entraria como 0 min);
+    //   sem msg do consultor -> sem tempo de resposta.
     const temTipo = grp.some(r => r.tipo);
     const doBO = grp.filter(r => r.tipo === 'Admin');
     const abertura = minimo_(grp.map(r => r.abertura));
-    const resposta = temTipo ? minimo_(doBO.map(r => r.mensagem)) : minimo_(grp.map(r => r.resposta));
+    const abertoPeloBO = primeiroNaoVazio_(grp.map(r => r.emissor)) === 'Admin';
+    let resposta = null, inicioResposta = abertura;
+    if (!temTipo) {
+      resposta = minimo_(grp.map(r => r.resposta));
+    } else if (!abertoPeloBO) {
+      resposta = minimo_(doBO.map(r => r.mensagem));
+    } else {
+      const iCons = grp.findIndex(r => r.tipo === 'Consultant' && r.mensagem != null);
+      const resp = iCons >= 0 ? grp.slice(iCons + 1).find(r => r.tipo === 'Admin' && r.mensagem != null) : null;
+      inicioResposta = iCons >= 0 ? grp[iCons].mensagem : null;
+      resposta = resp ? resp.mensagem : null;
+    }
     let ultima = maximo_(grp.map(r => r.mensagem));
     if (ultima == null) ultima = minimo_(grp.map(r => r.resposta));
 
@@ -393,7 +410,9 @@ function consolidar_(grupos, agora) {
       const fim = (status === 'open' || status === 'processing') ? agora : (ultima ?? abertura);
       tProc = round1_((fim - abertura) / 3600000);
     }
-    const tResp = (abertura != null && resposta != null) ? round1_((resposta - abertura) / 3600000) : null;
+    // Em horas úteis (sem sábados, domingos e feriados nacionais), coerente com o SLA de 1 dia útil
+    const tResp = (inicioResposta != null && resposta != null && resposta >= inicioResposta)
+      ? round1_(horasUteis_(inicioResposta, resposta)) : null;
 
     out.push({
       tid:        Number(tid) || tid,
@@ -444,8 +463,8 @@ function resolverStatus_(lista) {
 // ═══════════════════════════════ Formato do JSON ═══════════════════════════
 // Textos repetidos viram índices em listas para manter o JSON pequeno.
 // Linha de ticket:
-//   [0 ticket_id, 1 assunto, 2 status, 3 abertura, 4 primeira_resposta_BO, 5 ultima_mensagem,
-//    6 tempo_processo_h, 7 tempo_resposta_h, 8 n_mensagens, 9 trocas_de_responsavel,
+//   [0 ticket_id, 1 assunto, 2 status, 3 abertura, 4 primeira_resposta_BO (ao consultor), 5 ultima_mensagem,
+//    6 tempo_processo_h (corridas), 7 tempo_resposta_h (horas úteis), 8 n_mensagens, 9 trocas_de_responsavel,
 //    10 analista (último remetente Admin), 11 consultor, 12 escritorio, 13 fila (FILA),
 //    — só quando o ticket foi transferido de assunto —
 //    14 data_transferencia, 15 assunto_origem, 16 assunto_destino, 17 area_origem, 18 area_destino, 19 tipo]
@@ -572,6 +591,33 @@ function fmtDt_(ms) {
   return ms == null ? '' : new Date(ms - 3 * 3600000).toISOString().slice(0, 16).replace('T', ' ');
 }
 function round1_(x) { return Math.round(x * 10) / 10; }
+
+// ── Dias úteis (mesma regra do Regras.html: feriados nacionais fixos + Sexta-feira Santa) ──
+const FERIADOS_FIXOS = ['01-01', '04-21', '05-01', '09-07', '10-12', '11-02', '11-15', '11-20', '12-25'];
+const _feriados = {};
+function feriados_(ano) {
+  if (_feriados[ano]) return _feriados[ano];
+  const a = ano % 19, b = Math.floor(ano / 100), c = ano % 100, d = Math.floor(b / 4), e = b % 4;
+  const f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mes = Math.floor((h + l - 7 * m + 114) / 31), dia = ((h + l - 7 * m + 114) % 31) + 1;
+  const sexta = new Date(Date.UTC(ano, mes - 1, dia - 2)).toISOString().slice(0, 10);
+  return _feriados[ano] = new Set(FERIADOS_FIXOS.map(md => `${ano}-${md}`).concat([sexta]));
+}
+const DIA_MS = 86400000, BRT_MS = 3 * 3600000;   // Brasília = UTC-3 (ver localMs_)
+function diaUtilMs_(inicioDiaLocal) {
+  const iso = new Date(inicioDiaLocal).toISOString().slice(0, 10), wd = new Date(inicioDiaLocal).getUTCDay();
+  return wd !== 0 && wd !== 6 && !feriados_(+iso.slice(0, 4)).has(iso);
+}
+/** Horas entre dois instantes (epoch ms), descontando as horas de sábados, domingos e feriados. */
+function horasUteis_(ini, fim) {
+  const a = ini - BRT_MS, b = fim - BRT_MS;   // relógio de Brasília
+  let ms = 0;
+  for (let dia = Math.floor(a / DIA_MS) * DIA_MS; dia < b; dia += DIA_MS) {
+    if (diaUtilMs_(dia)) ms += Math.max(0, Math.min(b, dia + DIA_MS) - Math.max(a, dia));
+  }
+  return ms / 3600000;
+}
 function minimo_(arr) { const f = arr.filter(x => x != null); return f.length ? Math.min.apply(null, f) : null; }
 function maximo_(arr) { const f = arr.filter(x => x != null); return f.length ? Math.max.apply(null, f) : null; }
 function primeiroNaoVazio_(arr) { return arr.find(x => x) || ''; }

@@ -157,7 +157,7 @@
     <div class="kpis">
       <div class="kpi"><div class="kpi-label">Abertos</div><div class="kpi-value" id="kAbertos">–</div><div class="kpi-sub" id="kAbertosSub"></div><div class="delta" id="dAbertos"></div></div>
       <div class="kpi ok"><div class="kpi-label">Fechados</div><div class="kpi-value" id="kFech">–</div><div class="kpi-sub" id="kFechSub"></div><div class="delta" id="dFech"></div></div>
-      <div class="kpi"><div class="kpi-label">1ª resposta (mediana)</div><div class="kpi-value" id="kResp">–</div><div class="kpi-sub">da abertura à 1ª resposta do BO</div><div class="delta" id="dResp"></div></div>
+      <div class="kpi"><div class="kpi-label">1ª resposta (mediana)</div><div class="kpi-value" id="kResp">–</div><div class="kpi-sub">horas úteis · consultor → 1ª resposta do BO</div><div class="delta" id="dResp"></div></div>
       <div class="kpi warn"><div class="kpi-label">Transferidos</div><div class="kpi-value" id="kTransf">–</div><div class="kpi-sub" id="kTransfSub"></div><div class="delta" id="dTransf"></div></div>
     </div>
 
@@ -412,7 +412,7 @@ function montarRelatorio(){
   const cel = (v, alerta) => `<td style="${st.td}${alerta ? ';color:#ff0000;font-weight:bold' : ''}">${v}</td>`;
   const kpis = [
     ['Abertos na semana', fmt(r.abertos)], ['Fechados', `${fmt(r.fechados)} (${pct(r.fechados, r.abertos)})`],
-    ['1ª resposta (mediana)', fmtH(r.resp)], ['Transferidos', fmt(r.transf)],
+    ['1ª resposta (mediana, h úteis)', fmtH(r.resp)], ['Transferidos', fmt(r.transf)],
     ['Aguardando BO agora', fmt(r.agora.bo)], ['Em atraso · sem resposta', fmt(r.agora.atrResp)], ['Em atraso · transferência', fmt(r.agora.atrTransf)],
   ];
   const tabKpis = `<table style="${st.tab}"><tr>${kpis.map(k => `<th style="${st.th}">${k[0]}</th>`).join('')}</tr>`
@@ -429,7 +429,7 @@ function montarRelatorio(){
   const html = `<div>
     <p style="${st.h}"><b>Relatório semanal de tickets · BackOffice</b></p>
     <p style="${st.p}">Semana de ${semana} · dados atualizados em ${fmtData(D.geradoEm).replace(' ', ' às ')} (Metabase).
-      SLA de 1 dia útil: vence no mesmo horário do próximo dia útil. Considera tickets abertos desde ${fmtDia(inicioJanela())} (últimos ${JANELA_DIAS} dias).</p>
+      SLA de 1 dia útil: vence no mesmo horário do próximo dia útil. Tempo de resposta em horas úteis. Considera tickets abertos desde ${fmtDia(inicioJanela())} (últimos ${JANELA_DIAS} dias).</p>
     <p style="${st.h3}"><b>Resumo da semana</b></p>${tabKpis}
     <p style="${st.h3}"><b>Por departamento</b></p>${tabDep}
     <p style="${st.h3}"><b>Situação por assunto</b></p>${titan}

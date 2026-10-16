@@ -28,3 +28,6 @@ backups/
 
 # Dados locais do dev_server.py (contem nomes de pessoas)
 apps_script/.dev/
+
+# Arquivos de validacao gerados localmente (tem dados de tickets)
+validacao/
