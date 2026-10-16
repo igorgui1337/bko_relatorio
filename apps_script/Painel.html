@@ -115,7 +115,7 @@
   .previa{background:#f4f7f6;color:#000;margin:12px 16px 16px;border:1px solid var(--border);border-radius:8px;padding:0;overflow:auto;max-height:70vh}
 </style>
 </head>
-<body>
+<body data-url-completo="<?= urlGerencial ?>" data-url-painel="<?= urlPainel ?>">
 <div class="pagina">
   <header class="topo">
     <svg class="logo" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 46 23" role="img" aria-label="W1"><path fill="currentColor" d="M28.8999 5.55113H36.0169L22.3504 22.7286L17.0917 22.7244C15.527 22.7244 14.2587 21.4574 14.2587 19.8947V14.4496L7.67968 22.7286H3.09095C1.52486 22.7286 0.255127 21.4616 0.255127 19.8989V5.55113H5.94364V16.0138L14.2587 5.55113H19.9303V16.8365L28.8999 5.55113ZM45.7955 3.04654C45.7955 1.48381 44.5258 0.216797 42.9597 0.216797H33.1375L30.6149 3.39133H37.722V22.7272H45.7955V3.04654Z"></path></svg>
@@ -210,8 +210,10 @@ let CONFIG = { destinatarios: '', assunto: 'Relatório semanal de tickets · Bac
 const DIAS_BUSCA = 30;               // busca personalizada: últimos 30 dias
 const JANELA_DIAS = 120;             // o painel só considera tickets abertos nos últimos 120 dias
 const RECARREGAR_MS = 10 * 60000;    // com a página aberta, busca dados novos a cada 10 min
-const URL_COMPLETO = '<?= urlGerencial ?>';
-const URL_PAINEL = '<?= urlPainel ?>';
+// Links vêm de atributos do <body>: dentro de <script> o Apps Script imprime os valores do template
+// já entre aspas (escape contextual de JavaScript), o que quebrava a página inteira no Google.
+const URL_COMPLETO = document.body.dataset.urlCompleto || '';
+const URL_PAINEL = document.body.dataset.urlPainel || '';
 const periodo = { de: '', ate: '', semana: true };
 
 // ── Datas (strings yyyy-MM-dd, sem fuso) ───────────────────────────────────

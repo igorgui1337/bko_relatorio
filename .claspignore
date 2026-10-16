@@ -1,0 +1,11 @@
+# Só os arquivos do projeto Apps Script vão para o Google (clasp push).
+# Os caminhos são relativos à pasta apps_script/ (rootDir do .clasp.json).
+**/**
+!Code.gs
+!Departamentos.gs
+!Index.html
+!Painel.html
+!Diretoria.html
+!Regras.html
+!Relatorio.html
+!appsscript.json
