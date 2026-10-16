@@ -112,7 +112,7 @@
   .modal-topo h2{margin:0;font-size:15px;color:var(--brand)}
   .modal-topo .acoes{margin-left:auto}
   .modal-info{font-size:11.5px;color:var(--muted);padding:8px 16px 0}
-  .previa{background:#fff;color:#000;margin:12px 16px 16px;border:1px solid var(--border);border-radius:8px;padding:16px;overflow:auto;max-height:65vh}
+  .previa{background:#f4f7f6;color:#000;margin:12px 16px 16px;border:1px solid var(--border);border-radius:8px;padding:0;overflow:auto;max-height:70vh}
 </style>
 </head>
 <body>
@@ -211,6 +211,7 @@ const DIAS_BUSCA = 30;               // busca personalizada: últimos 30 dias
 const JANELA_DIAS = 120;             // o painel só considera tickets abertos nos últimos 120 dias
 const RECARREGAR_MS = 10 * 60000;    // com a página aberta, busca dados novos a cada 10 min
 const URL_COMPLETO = '<?= urlGerencial ?>';
+const URL_PAINEL = '<?= urlPainel ?>';
 const periodo = { de: '', ate: '', semana: true };
 
 // ── Datas (strings yyyy-MM-dd, sem fuso) ───────────────────────────────────
@@ -279,14 +280,18 @@ function intervaloAnterior(){
  * Linha de contexto do cartão ("information without context is spam").
  * modo: 'pct' (variação %), 'pp' (pontos percentuais) · melhor: 'sobe' | 'desce' | null (só informa).
  */
-function variacao(el, atual, ant, modo, melhor, rotulo){
-  if (!rotulo){ el.textContent = 'sem base para comparar'; el.className = 'delta neutro'; return; }
-  if (atual == null || ant == null || (modo !== 'pp' && !ant)){ el.textContent = `sem dado em ${rotulo}`; el.className = 'delta neutro'; return; }
+function infoVariacao(atual, ant, modo, melhor, rotulo){
+  if (!rotulo) return { texto: 'sem base para comparar', tom: 'neutro' };
+  if (atual == null || ant == null || (modo !== 'pp' && !ant)) return { texto: `sem dado em ${rotulo}`, tom: 'neutro' };
   const dif = modo === 'pp' ? atual - ant : (atual - ant) / ant * 100;
   const igual = Math.abs(dif) < 0.05;
   const seta = igual ? '=' : dif > 0 ? '▲' : '▼';
-  el.textContent = `${seta} ${igual ? '' : Math.abs(dif).toFixed(1).replace('.', ',') + (modo === 'pp' ? ' p.p.' : '%') + ' '}vs ${rotulo}`;
-  el.className = 'delta ' + (!melhor || igual ? 'neutro' : ((dif > 0) === (melhor === 'sobe') ? 'bom' : 'ruim'));
+  return { texto: `${seta} ${igual ? '' : Math.abs(dif).toFixed(1).replace('.', ',') + (modo === 'pp' ? ' p.p.' : '%') + ' '}vs ${rotulo}`,
+           tom: !melhor || igual ? 'neutro' : ((dif > 0) === (melhor === 'sobe') ? 'bom' : 'ruim') };
+}
+function variacao(el, atual, ant, modo, melhor, rotulo){
+  const v = infoVariacao(atual, ant, modo, melhor, rotulo);
+  el.textContent = v.texto; el.className = 'delta ' + v.tom;
 }
 
 /** Números do período (pela abertura) + retrato de agora (tickets da janela de 120 dias). */
@@ -397,46 +402,99 @@ function render(){
 // ── Relatório semanal ──────────────────────────────────────────────────────
 let RELATORIO = null;   // { html, texto, resumo, assunto }
 
+/**
+ * Relatório semanal em HTML para e-mail. Só tabelas e estilos inline (Gmail e Outlook descartam
+ * <style>, flexbox e SVG); cores da paleta W1 em tema claro.
+ */
 function montarRelatorio(){
   const r = resumo(), deps = porDepartamento(r.L);
   const semana = rotuloPeriodo();
-  const st = {
-    p: 'font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#222;margin:0 0 10px',
-    h: 'font-family:Arial,Helvetica,sans-serif;font-size:16px;color:#0b494b;margin:0 0 4px',
-    h3: 'font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#0b494b;margin:16px 0 6px;text-transform:uppercase',
-    tab: 'border-collapse:collapse;font-family:Arial,Helvetica,sans-serif;font-size:12px',
-    th: 'border:1px solid #999;padding:4px 8px;background:#eef3f2;font-weight:bold;text-align:center;color:#000',
-    td: 'border:1px solid #999;padding:4px 8px;text-align:right;color:#000',
-    tdl: 'border:1px solid #999;padding:4px 8px;text-align:left;color:#000',
-  };
-  const cel = (v, alerta) => `<td style="${st.td}${alerta ? ';color:#ff0000;font-weight:bold' : ''}">${v}</td>`;
-  const kpis = [
-    ['Abertos na semana', fmt(r.abertos)], ['Fechados', `${fmt(r.fechados)} (${pct(r.fechados, r.abertos)})`],
-    ['1ª resposta (mediana, h úteis)', fmtH(r.resp)], ['Transferidos', fmt(r.transf)],
-    ['Aguardando BO agora', fmt(r.agora.bo)], ['Em atraso · sem resposta', fmt(r.agora.atrResp)], ['Em atraso · transferência', fmt(r.agora.atrTransf)],
-  ];
-  const tabKpis = `<table style="${st.tab}"><tr>${kpis.map(k => `<th style="${st.th}">${k[0]}</th>`).join('')}</tr>`
-    + `<tr>${kpis.map((k, i) => cel(k[1], i >= 5 && k[1] !== '0')).join('')}</tr></table>`;
-  const tabDep = `<table style="${st.tab}"><tr>${['Departamento', 'Abertos', 'Fechados', '% fechados', '1ª resposta', 'Em dia', 'Atraso · sem resposta', 'Atraso · transferência', 'Últ. transferência']
-      .map(h => `<th style="${st.th}">${h}</th>`).join('')}</tr>`
-    + deps.map(x => `<tr><td style="${st.tdl}">${esc(x.d)}</td>${cel(fmt(x.ab))}${cel(fmt(x.fe))}${cel(x.ab ? pct(x.fe, x.ab) : '–')}${cel(fmtH(mediana(x.resp)))}${cel(fmt(x.dia))}${cel(fmt(x.ar), x.ar)}${cel(fmt(x.at), x.at)}${cel(x.ult ? fmtDia(x.ult) : '–')}</tr>`).join('')
-    + '</table>';
-  // Tabela por assunto no formato do Titan (a mesma do relatório de atrasos)
-  const tmp = document.createElement('table');
-  tmp.innerHTML = tabelaTitan(montarLinhas(null, janela()));
-  const titan = tabelaParaEmail(tmp);
+  const ant = intervaloAnterior(), a = ant && numerosDe(doIntervalo(ant.de, ant.ate), ant.corte), rot = ant && ant.rotulo;
+  const C = { marca: '#0b494b', marca2: '#13908f', fundo: '#f4f7f6', borda: '#dbe4e3', linha: '#e4ecea', zebra: '#f7faf9',
+              texto: '#0c2b2b', apagado: '#5a6b6a', bom: '#0b7a5b', ruim: '#c0442e', alerta: '#e8a33d' };
+  const FONTE = "font-family:'Segoe UI',Arial,Helvetica,sans-serif";
+  const corTom = tom => tom === 'bom' ? C.bom : tom === 'ruim' ? C.ruim : C.apagado;
 
-  const html = `<div>
-    <p style="${st.h}"><b>Relatório semanal de tickets · BackOffice</b></p>
-    <p style="${st.p}">Semana de ${semana} · dados atualizados em ${fmtData(D.geradoEm).replace(' ', ' às ')} (Metabase).
-      SLA de 1 dia útil: vence no mesmo horário do próximo dia útil. Tempo de resposta em horas úteis. Considera tickets abertos desde ${fmtDia(inicioJanela())} (últimos ${JANELA_DIAS} dias).</p>
-    <p style="${st.h3}"><b>Resumo da semana</b></p>${tabKpis}
-    <p style="${st.h3}"><b>Por departamento</b></p>${tabDep}
-    <p style="${st.h3}"><b>Situação por assunto</b></p>${titan}
-    <p style="${st.p};margin-top:14px">Detalhes por ticket, analista e escritório no <a href="${esc(URL_COMPLETO)}">painel completo</a>.</p>
-  </div>`;
-  const texto = [`Relatório semanal de tickets · BackOffice — semana de ${semana}`, ...kpis.map(k => `${k[0]}: ${k[1]}`),
-    `Painel completo: ${URL_COMPLETO}`].join('\n');
+  // Cartão: rótulo, número grande e uma linha de contexto (variação ou proporção)
+  const cartao = (rotulo, valor, contexto, corBarra, corValor, corContexto) => `
+    <td width="25%" valign="top" style="padding:5px">
+      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;background:#ffffff;border:1px solid ${C.borda};border-left:4px solid ${corBarra};border-radius:8px">
+        <tr><td style="padding:10px 12px;${FONTE}">
+          <div style="font-size:10px;font-weight:bold;letter-spacing:.06em;text-transform:uppercase;color:${C.apagado}">${rotulo}</div>
+          <div style="font-size:24px;font-weight:bold;line-height:1.25;color:${corValor || C.marca}">${valor}</div>
+          <div style="font-size:11px;color:${corContexto || C.apagado}">${contexto}</div>
+        </td></tr>
+      </table>
+    </td>`;
+  const linhaCartoes = celulas => `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>${celulas.join('')}</tr></table>`;
+  const vAb = infoVariacao(r.abertos, a && a.abertos, 'pct', null, rot);
+  const vFe = infoVariacao(r.pctFech, a && a.pctFech, 'pp', 'sobe', rot);
+  const vRe = infoVariacao(r.resp, a && a.resp, 'pct', 'desce', rot);
+  const vTr = infoVariacao(r.transf, a && a.transf, 'pct', 'desce', rot);
+  const bo = r.agora.bo, atr = r.agora.atrResp + r.agora.atrTransf;
+  const semana4 = linhaCartoes([
+    cartao('Abertos', fmt(r.abertos), vAb.texto, C.marca2, null, corTom(vAb.tom)),
+    cartao('Fechados', `${fmt(r.fechados)} <span style="font-size:13px;color:${C.apagado}">(${pct(r.fechados, r.abertos)})</span>`, vFe.texto, C.bom, null, corTom(vFe.tom)),
+    cartao('1ª resposta · mediana', fmtH(r.resp), vRe.texto, C.marca2, null, corTom(vRe.tom)),
+    cartao('Transferidos', fmt(r.transf), vTr.texto, C.alerta, null, corTom(vTr.tom)),
+  ]);
+  const agora4 = linhaCartoes([
+    cartao('Aguardando BO', fmt(bo), `${fmt(atr)} em atraso (${pct(atr, bo)})`, C.alerta),
+    cartao('Em dia', fmt(r.agora.emDia), `${pct(r.agora.emDia, bo)} dos aguardando BO`, C.bom),
+    cartao('Atraso · sem resposta', fmt(r.agora.atrResp), `${pct(r.agora.atrResp, bo)} dos aguardando BO`, C.ruim, C.ruim),
+    cartao('Atraso · transferência', fmt(r.agora.atrTransf), `${pct(r.agora.atrTransf, bo)} dos aguardando BO`, C.ruim, C.ruim),
+  ]);
+
+  const titulo = t => `<div style="${FONTE};font-size:12px;font-weight:bold;letter-spacing:.06em;text-transform:uppercase;color:${C.marca};margin:22px 5px 8px;padding-bottom:5px;border-bottom:2px solid ${C.marca2}">${t}</div>`;
+  const sub = t => `<div style="${FONTE};font-size:11px;color:${C.apagado};margin:-4px 5px 8px">${t}</div>`;
+
+  // Tabelas (mesmo estilo nas duas)
+  const est = {
+    table: `width:100%;border-collapse:collapse;${FONTE};font-size:12px;background:#ffffff;border:1px solid ${C.borda}`,
+    th: `padding:6px 5px;background:#eef3f2;color:${C.apagado};font-size:9.5px;font-weight:bold;text-transform:uppercase;letter-spacing:.03em;text-align:center;border-bottom:1px solid ${C.borda}`,
+    td: `padding:5px 6px;border-bottom:1px solid ${C.linha};text-align:right;white-space:nowrap;font-size:11.5px`,
+    total: `;font-weight:bold;border-top:2px solid ${C.marca2};background:#eef3f2`,
+    cor: C.texto, corAtraso: C.ruim, zebra: C.zebra, quebraTexto: true,
+  };
+  const nz = v => v ? fmt(v) : '–';
+  const verm = v => v ? `<span style="color:${C.ruim};font-weight:bold">${fmt(v)}</span>` : '–';
+  const tabDep = document.createElement('table');
+  tabDep.innerHTML = `<thead><tr>${['Departamento', 'Abertos', 'Fechados', '% fech.', '1ª resposta', 'Em dia', 'Atraso · sem resp.', 'Atraso · transf.', 'Últ. transf.'].map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>`
+    + deps.map(x => `<tr><td class="txt">${esc(x.d)}</td><td>${nz(x.ab)}</td><td>${nz(x.fe)}</td><td>${x.ab ? pct(x.fe, x.ab) : '–'}</td>
+        <td>${fmtH(mediana(x.resp))}</td><td>${nz(x.dia)}</td><td>${verm(x.ar)}</td><td>${verm(x.at)}</td><td>${x.ult ? fmtDia(x.ult) : '–'}</td></tr>`).join('')
+    + `<tr class="total"><td class="txt">Total</td><td>${fmt(r.abertos)}</td><td>${fmt(r.fechados)}</td><td>${pct(r.fechados, r.abertos)}</td><td>${fmtH(r.resp)}</td>
+        <td>${fmt(r.agora.emDia)}</td><td>${fmt(r.agora.atrResp)}</td><td>${fmt(r.agora.atrTransf)}</td><td></td></tr></tbody>`;
+  // Tabela por assunto no formato do Titan (as mesmas linhas do relatório de atrasos)
+  const tabTitan = document.createElement('table');
+  tabTitan.innerHTML = tabelaTitan(montarLinhas(null, janela()));
+
+  const botao = (txt, url, cheio) => url ? `<a href="${esc(url)}" style="display:inline-block;${FONTE};font-size:13px;font-weight:bold;text-decoration:none;padding:9px 16px;border-radius:7px;margin:0 6px 6px 0;${cheio
+    ? `background:${C.marca};color:#ffffff;border:1px solid ${C.marca}` : `background:#ffffff;color:${C.marca};border:1px solid ${C.marca}`}">${txt}</a>` : '';
+
+  const html = `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:${C.fundo}"><tr><td align="center" style="padding:18px 8px">
+  <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;width:100%;max-width:760px;background:#ffffff;border:1px solid ${C.borda};border-radius:12px;overflow:hidden">
+    <tr><td bgcolor="${C.marca}" style="background:${C.marca};padding:18px 22px;${FONTE}">
+      <div style="font-size:11px;font-weight:bold;letter-spacing:.1em;text-transform:uppercase;color:#9fd8d6">W1 · BackOffice</div>
+      <div style="font-size:21px;font-weight:bold;color:#ffffff;margin-top:2px">Relatório semanal de tickets</div>
+      <div style="font-size:13px;color:#d7eeed;margin-top:4px">Semana de ${semana} · dados de ${fmtData(D.geradoEm).replace(' ', ' às ')}</div>
+    </td></tr>
+    <tr><td style="padding:6px 17px 20px">
+      ${titulo('Na semana')}${sub(`tickets abertos de ${semana}${rot ? ` · comparação: ${rot}` : ''}`)}${semana4}
+      ${titulo('Agora')}${sub(`tickets abertos desde ${fmtDia(inicioJanela())} que aguardam o BackOffice · SLA de 1 dia útil`)}${agora4}
+      ${titulo('Por departamento')}<div style="padding:0 5px">${tabelaParaEmail(tabDep, est)}</div>
+      ${titulo('Situação por assunto')}${sub('em processo pelo mês de abertura · em dia e atrasos de agora')}<div style="padding:0 5px">${tabelaParaEmail(tabTitan, est)}</div>
+      <div style="padding:20px 5px 0">${botao('Abrir o painel', URL_PAINEL, true)}${botao('Ver painel completo', URL_COMPLETO, false)}</div>
+      <div style="${FONTE};font-size:11px;color:${C.apagado};padding:10px 5px 0;line-height:1.5">
+        SLA de 1 dia útil: vence no mesmo horário do próximo dia útil (fins de semana e feriados nacionais não contam).
+        Tempo de resposta em horas úteis, da mensagem do consultor à 1ª resposta do BO. Fonte: Metabase.
+      </div>
+    </td></tr>
+  </table>
+  </td></tr></table>`;
+  const texto = [`Relatório semanal de tickets · BackOffice — semana de ${semana}`,
+    `Abertos: ${fmt(r.abertos)} · Fechados: ${fmt(r.fechados)} (${pct(r.fechados, r.abertos)}) · 1ª resposta (mediana): ${fmtH(r.resp)} · Transferidos: ${fmt(r.transf)}`,
+    `Agora: ${fmt(bo)} aguardando BO · ${fmt(r.agora.emDia)} em dia · ${fmt(r.agora.atrResp)} atraso sem resposta · ${fmt(r.agora.atrTransf)} atraso por transferência`,
+    URL_PAINEL ? `Painel: ${URL_PAINEL}` : '', URL_COMPLETO ? `Painel completo: ${URL_COMPLETO}` : ''].filter(Boolean).join('\n');
   return {
     html, texto, assunto: CONFIG.assunto.replace('{semana}', semana),
     resumo: { inicio: periodo.de, fim: periodo.ate, abertos: r.abertos, fechados: r.fechados,

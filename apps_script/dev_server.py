@@ -3,7 +3,8 @@
 dev_server.py — pré-visualização local das páginas do Apps Script (sem Google).
 
 Faz o papel do HtmlService: monta Index.html, Painel.html e Diretoria.html trocando
-<?!= include('X') ?> pelo conteúdo de X.html e <?= urlGerencial ?> por /index, e injeta um
+<?!= include('X') ?> pelo conteúdo de X.html, <?= urlGerencial ?> por /index e <?= urlPainel ?>
+por /painel, e injeta um
 google.script.run falso:
   getDados()           -> conteúdo de apps_script/.dev/dados.b64 (gzip+base64, como no Drive)
   getConfigRelatorio() -> destinatários/assunto de exemplo
@@ -48,7 +49,7 @@ def montar(nome: str) -> str:
     html = (PASTA / f"{nome}.html").read_text(encoding="utf-8")
     html = re.sub(r"<\?!=\s*include\('(\w+)'\)\s*\?>",
                   lambda m: (PASTA / f"{m.group(1)}.html").read_text(encoding="utf-8"), html)
-    html = html.replace("<?= urlGerencial ?>", "/index")
+    html = html.replace("<?= urlGerencial ?>", "/index").replace("<?= urlPainel ?>", "/painel")
     return html.replace("<head>", "<head>\n" + STUB, 1)
 
 

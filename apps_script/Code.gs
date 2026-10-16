@@ -85,20 +85,26 @@ const OBRIGATORIAS = ['ticket_id', 'ticket_subject', 'open_at', 'status'];
 /**
  * Serve só a página; os dados vêm depois por getDados(). Assim a tela abre na hora
  * em vez de esperar o Drive + a montagem de ~6 MB de HTML.
- *   (sem parâmetro)  -> Index.html     painel completo / gerencial
- *   ?v=painel        -> Painel.html    painel de tempo real (semana vigente) + relatório semanal
+ *   (sem parâmetro)  -> Painel.html    PÁGINA PRINCIPAL: painel de tempo real + relatório semanal
+ *   ?v=completo      -> Index.html     painel completo / gerencial (também ?v=gerencial)
  *   ?v=diretoria     -> Diretoria.html relatório de tickets em atraso (formato do Titan)
+ *   ?v=painel        -> Painel.html    (mantido para links antigos)
  * Todas incluem Regras.html (SLA, fila, transferência); Painel e Diretoria incluem Relatorio.html.
  */
+const PAGINA_PRINCIPAL = ['Painel', 'Painel de Tickets · Tempo real'];
 const PAGINAS = {
-  painel:    ['Painel', 'Painel de Tickets · Tempo real'],
+  painel:    PAGINA_PRINCIPAL,
+  completo:  ['Index', 'Tickets · BackOffice · Painel completo'],
+  gerencial: ['Index', 'Tickets · BackOffice · Painel completo'],
   diretoria: ['Diretoria', 'Relatório de Tickets em Atraso · BackOffice'],
 };
 function doGet(e) {
   const v = e && e.parameter && e.parameter.v;
-  const [arquivo, titulo] = Object.prototype.hasOwnProperty.call(PAGINAS, v) ? PAGINAS[v] : ['Index', 'Tickets · BackOffice'];
+  const [arquivo, titulo] = Object.prototype.hasOwnProperty.call(PAGINAS, v) ? PAGINAS[v] : PAGINA_PRINCIPAL;
   const t = HtmlService.createTemplateFromFile(arquivo);
-  t.urlGerencial = ScriptApp.getService().getUrl();   // link "ver painel completo"
+  const url = ScriptApp.getService().getUrl();
+  t.urlPainel = url;                        // link "voltar ao painel"
+  t.urlGerencial = url + '?v=completo';     // link "ver painel completo"
   return t.evaluate()
     .setTitle(titulo)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')

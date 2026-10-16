@@ -68,23 +68,31 @@ function tabelaTitan({ linhas, meses, mesAtual, tot }){
   return head + '<tbody>' + corpo + total + '</tbody>';
 }
 
-/** Cópia da tabela com estilos inline (Gmail/Outlook descartam o <style> da página). */
-function tabelaParaEmail(tabela){
-  const css = {
+/**
+ * Cópia da tabela com estilos inline (Gmail/Outlook descartam o <style> da página).
+ * estilo (opcional): sobrescreve table/th/td, a cor das linhas com atraso (corAtraso),
+ * a cor do texto (cor) e o fundo zebrado (zebra). Padrão: o visual do relatório do Titan.
+ */
+function tabelaParaEmail(tabela, estilo){
+  const css = Object.assign({
     table: 'border-collapse:collapse;font-family:Times New Roman,serif;font-size:12px',
     th: 'border:1px solid #999;padding:3px 6px;font-weight:bold;text-align:center;background:#fff;color:#000',
     td: 'border:1px solid #999;padding:3px 6px;text-align:right',
-  };
+    total: ';font-weight:bold;border-top:2px solid #000',
+    cor: '#000', corAtraso: '#ff0000', zebra: '', quebraTexto: false,
+  }, estilo || {});
   const clone = tabela.cloneNode(true);
   clone.removeAttribute('id'); clone.removeAttribute('class');
   clone.setAttribute('style', css.table);
+  clone.setAttribute('cellpadding', '0'); clone.setAttribute('cellspacing', '0');
   clone.querySelectorAll('th').forEach(e => { e.removeAttribute('class'); e.setAttribute('style', css.th); });
-  clone.querySelectorAll('tr').forEach(tr => {
+  clone.querySelectorAll('tbody tr').forEach((tr, i) => {
     const vermelho = tr.classList.contains('atraso'), negrito = tr.classList.contains('total');
-    tr.querySelectorAll('td').forEach(td => td.setAttribute('style', css.td
-      + (td.classList.contains('txt') ? ';text-align:left' : '')
-      + (vermelho ? ';color:#ff0000' : ';color:#000')
-      + (negrito ? ';font-weight:bold;border-top:2px solid #000' : '')));
+    const fundo = css.zebra && i % 2 && !negrito ? `;background:${css.zebra}` : '';
+    tr.querySelectorAll('td').forEach(td => td.setAttribute('style', css.td + fundo
+      + (td.classList.contains('txt') ? ';text-align:left' + (css.quebraTexto ? ';white-space:normal' : '') : '')
+      + (vermelho ? `;color:${css.corAtraso}` : `;color:${css.cor}`)
+      + (negrito ? css.total : '')));
     tr.removeAttribute('class');
     tr.querySelectorAll('td').forEach(td => td.removeAttribute('class'));
   });

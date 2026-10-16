@@ -11,7 +11,7 @@ Domingo às 5h  → cargaCompleta()       desde METABASE_DATA_INICIO (acerta o s
     → consolidar_()  (mesma lógica do processador_relatorio_data.consolidate)
     → substitui os tickets da janela no JSON salvo e mantém os mais antigos
     → JSON no Drive (gzip + base64: ~1,6 MB para ~57 mil tickets)
-Web app doGet() → Index.html (painel completo), Painel.html (?v=painel) ou Diretoria.html (?v=diretoria); os dados vêm por getDados()
+Web app doGet() → Painel.html (página principal, /exec), Index.html (painel completo, ?v=completo) ou Diretoria.html (?v=diretoria); os dados vêm por getDados()
 ```
 
 **Limite da janela de 60 dias:** ela não enxerga mudanças de status em tickets abertos antes dela. Em out/2026, 4.841 dos 7.040 tickets não fechados tinham mais de 60 dias. Por isso a `cargaCompleta` roda todo domingo. Se precisar acertar antes, rode-a manualmente. O tempo em processo dos tickets não fechados é recalculado a cada execução, inclusive para os tickets antigos que foram mantidos.
@@ -99,7 +99,10 @@ Relatório de controle para a diretoria, no **mesmo formato do relatório do Tit
   - "Imprimir / PDF" gera uma folha A4 na horizontal.
 - **Teste sem publicar:** use **Implantar › Testar implantações** e abra a URL `/dev` com `?v=diretoria`.
 
-## Painel de tempo real (`?v=painel`)
+## Painel de tempo real — página principal (`/exec`)
+
+Desde 16/10/2026, o link `/exec` sem nada no final abre o **Painel**. O painel completo fica em `/exec?v=completo`, com um botão "← Painel" para voltar, e `?v=painel` continua funcionando para links antigos. No Google Sites e no Metabase, use a URL `/exec`.
+
 
 Painel para acompanhar a semana, com link para o painel completo. Pode ser colocado no Sites ou no Metabase com a URL `/exec?v=painel`. O web app já permite ser incorporado (`ALLOWALL`), mas quem abrir precisa estar logado com a conta Google da W1.
 
@@ -129,6 +132,7 @@ Painel para acompanhar a semana, com link para o painel completo. Pode ser coloc
      - os números por departamento;
      - a situação por assunto, no formato do Titan;
      - o link para o painel completo.
+  - O e-mail tem visual próprio: faixa de título W1, cartões da semana (com a comparação) e de agora, tabela por departamento (só os atrasos em vermelho), situação por assunto no formato do Titan e botões "Abrir o painel" e "Ver painel completo". É feito só com tabelas e estilos inline, para o Gmail e o Outlook manterem a aparência.
   2. "Copiar e abrir e-mail" copia o relatório e abre um e-mail novo no Gmail, já com destinatários e assunto (`RELATORIO_DESTINATARIOS` e `RELATORIO_ASSUNTO`). É só colar (Ctrl+V) e enviar.
   3. Grava a semana na planilha **"BKO · Histórico semanal de tickets"**: uma linha por semana; gerar de novo atualiza a linha. A planilha é criada na primeira vez, e o id fica em `HISTORICO_SHEET_ID`.
 
