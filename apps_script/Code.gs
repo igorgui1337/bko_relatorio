@@ -101,11 +101,11 @@ const PAGINAS = {
 function doGet(e) {
   const v = e && e.parameter && e.parameter.v;
   const [arquivo, titulo] = Object.prototype.hasOwnProperty.call(PAGINAS, v) ? PAGINAS[v] : PAGINA_PRINCIPAL;
-  const t = HtmlService.createTemplateFromFile(arquivo);
   const url = ScriptApp.getService().getUrl();
-  t.urlPainel = url;                        // link "voltar ao painel"
-  t.urlGerencial = url + '?v=completo';     // link "ver painel completo"
-  return t.evaluate()
+  return montarPagina_(arquivo, {
+    urlPainel: url,                         // link "voltar ao painel"
+    urlGerencial: url + '?v=completo',      // link "ver painel completo"
+  })
     .setTitle(titulo)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -114,6 +114,22 @@ function doGet(e) {
 /** Conteúdo de outro arquivo HTML do projeto, para <?!= include('Regras') ?> nas páginas. */
 function include(nome) {
   return HtmlService.createHtmlOutputFromFile(nome).getContent();
+}
+
+/**
+ * Monta a página sem o motor de template do HtmlService: lê o arquivo como está, encaixa os
+ * include('X') e troca os marcadores de link (só em atributos HTML, escapados).
+ * O template (createTemplateFromFile) interpretava as barras invertidas do JavaScript —
+ * .join('
+') virava uma quebra de linha real e a página inteira parava com SyntaxError.
+ * É a mesma montagem do dev_server.py, então o preview local fica igual ao Google.
+ */
+function montarPagina_(arquivo, vars) {
+  const escapar = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const html = HtmlService.createHtmlOutputFromFile(arquivo).getContent()
+    .replace(/<\?!=\s*include\('(\w+)'\)\s*\?>/g, (_, nome) => include(nome))
+    .replace(/<\?=\s*(\w+)\s*\?>/g, (_, chave) => escapar(vars[chave] == null ? '' : vars[chave]));
+  return HtmlService.createHtmlOutput(html);
 }
 
 
