@@ -111,6 +111,45 @@ function doGet(e) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+/**
+ * Diagnóstico: monta cada página exatamente como o doGet entrega e passa cada <script> pelo
+ * verificador de sintaxe do V8 do Google. Se um bloco falha, testa apagar cada linha sozinha
+ * e mostra as linhas cuja remoção conserta o bloco (só código, nenhum dado). Não altera nada.
+ */
+function diagnosticoPagina() {
+  const NL = String.fromCharCode(10);
+  const url = ScriptApp.getService().getUrl();
+  const compila = c => { try { new Function(c); return ''; } catch (e) { return e.message; } };
+  for (const arquivo of ['Painel', 'Index', 'Diretoria']) {
+    const html = montarPagina_(arquivo, { URL_PAINEL: url, URL_COMPLETO: url + '?v=completo' }).getContent();
+    console.log(`== ${arquivo}: ${html.split(NL).length} linhas | ${html.length} caracteres`);
+    const re = /<script[^>]*>([\s\S]*?)<\/script>/g;
+    let m, bloco = 0;
+    while ((m = re.exec(html))) {
+      bloco++;
+      const inicio = html.slice(0, m.index).split(NL).length;
+      const erro = compila(m[1]);
+      if (!erro) continue;
+      console.log(`   ERRO no <script> nº ${bloco} (linha ${inicio}): ${erro}`);
+      const ls = m[1].split(NL);
+      let achou = 0;
+      for (let i = 0; i < ls.length && achou < 8; i++) {
+        if (!ls[i].trim()) continue;
+        const sem = ls.slice(0, i).concat([''], ls.slice(i + 1)).join(NL);
+        const e2 = compila(sem);
+        if (!e2 || e2 !== erro) {
+          achou++;
+          console.log(`   linha ${inicio + i} (sem ela: ${e2 || 'compila'}):`);
+          for (let k = Math.max(0, i - 2); k <= Math.min(ls.length - 1, i + 2); k++)
+            console.log(`      ${k === i ? '>>' : '  '} ${inicio + k}: ${JSON.stringify(ls[k]).slice(0, 300)}`);
+        }
+      }
+      if (!achou) console.log('   nenhuma linha isolada explica o erro');
+    }
+    console.log(`   ${bloco} blocos <script> verificados`);
+  }
+}
+
 /** Conteúdo de outro arquivo HTML do projeto (marcador @@INCLUDE:Nome@@ nas páginas). */
 function include(nome) {
   return HtmlService.createHtmlOutputFromFile(nome).getContent();

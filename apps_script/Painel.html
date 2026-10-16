@@ -518,7 +518,8 @@ function abrirRelatorio(){
 function enviarRelatorio(){
   // Ordem importa, tudo dentro do clique: copiar primeiro (a cópia falha se a página perder o foco)
   // e só então abrir o Gmail (pop-up aberto fora do clique é bloqueado).
-  const url = 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(CONFIG.destinatarios) + '&su=' + encodeURIComponent(RELATORIO.assunto);
+  // sem barras duplas no texto: o Google apaga os comentários do JS ao servir e cortaria a linha no '//'
+  const url = 'https:' + '/' + '/mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(CONFIG.destinatarios) + '&su=' + encodeURIComponent(RELATORIO.assunto);
   const copiou = copiarSelecao(RELATORIO.html);
   const aba = window.open(url, '_blank');
   $('modal').classList.remove('on');
