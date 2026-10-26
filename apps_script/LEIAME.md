@@ -128,14 +128,13 @@ Painel para acompanhar a semana, com link para o painel completo. Pode ser coloc
   - Os cartões de agora mostram a proporção sobre o total aguardando o BO.
   - Segue o princípio de dashboards "informação sem contexto é spam", da skill `revenue-centric-design`.
 - **"Gerar relatório semanal":**
-  1. Mostra uma prévia em HTML com:
-     - o resumo da semana;
-     - os números por departamento;
-     - a situação por assunto, no formato do Titan;
-     - o link para o painel completo.
-  - O e-mail tem visual próprio: faixa de título W1, cartões da semana (com a comparação) e de agora, tabela por departamento (só os atrasos em vermelho), situação por assunto no formato do Titan e botões "Abrir o painel" e "Ver painel completo". É feito só com tabelas e estilos inline, para o Gmail e o Outlook manterem a aparência.
+  1. Mostra uma prévia em HTML do e-mail (formato aprovado pela gestão em 23/10/2026):
+     - **Tabela por departamento**, com os assuntos de cada um logo abaixo. Abertos, fechados, % fechados, 1ª resposta (mediana) e em processo contam os tickets **abertos no mês** em que a semana termina, até o fim da semana (ou até hoje). "Em processo" = não fechado e sem atraso (em dia + aguardando o consultor). As colunas **"Em atraso hoje"** (sem resposta, após transferência) são o retrato de agora, de todos os tickets da janela de 120 dias, inclusive de meses anteriores. Por isso a linha não soma com os abertos do mês.
+     - **Destaques da semana:** entrada de tickets, 1ª resposta e transferidos da semana comparados com as outras semanas do mês (`semanasDoMes`), por dia útil, com mini gráfico de barras. A semana em andamento conta só os dias completos (até ontem); uma semana sem dia útil é somada à seguinte. O quarto destaque traz os atrasos de agora: quantos são da semana, quantos vêm de antes do mês, o mais antigo e os 3 departamentos com mais atrasos.
+     - Uma legenda **"Como ler"**, porque o e-mail não aceita tooltips, e os botões "Abrir o painel" e "Ver painel completo".
+  - O e-mail é feito só com tabelas e estilos inline (sem `<style>`, flex, SVG ou script), para o Gmail e o Outlook manterem a aparência.
   2. "Copiar e abrir e-mail" copia o relatório e abre um e-mail novo no Gmail, já com destinatários e assunto (`RELATORIO_DESTINATARIOS` e `RELATORIO_ASSUNTO`). É só colar (Ctrl+V) e enviar.
-  3. Grava a semana na planilha **"BKO · Histórico semanal de tickets"**: uma linha por semana; gerar de novo atualiza a linha. A planilha é criada na primeira vez, e o id fica em `HISTORICO_SHEET_ID`.
+  3. Grava a semana na planilha **"BKO · Histórico semanal de tickets"**: uma linha por semana; gerar de novo atualiza a linha. A planilha continua com os números **da semana** (abertos, fechados, 1ª resposta, transferidos e o retrato de agora), e não os do mês, para a série histórica não mudar de base. A planilha é criada na primeira vez, e o id fica em `HISTORICO_SHEET_ID`.
 
 ## Tempo de resposta (desde 16/10/2026)
 

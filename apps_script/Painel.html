@@ -157,13 +157,13 @@
     <div class="kpis">
       <div class="kpi"><div class="kpi-label">Abertos</div><div class="kpi-value" id="kAbertos">–</div><div class="kpi-sub" id="kAbertosSub"></div><div class="delta" id="dAbertos"></div></div>
       <div class="kpi ok"><div class="kpi-label">Fechados</div><div class="kpi-value" id="kFech">–</div><div class="kpi-sub" id="kFechSub"></div><div class="delta" id="dFech"></div></div>
-      <div class="kpi"><div class="kpi-label">1ª resposta (mediana)</div><div class="kpi-value" id="kResp">–</div><div class="kpi-sub">horas úteis · consultor → 1ª resposta do BO</div><div class="delta" id="dResp"></div></div>
+      <div class="kpi"><div class="kpi-label">1ª resposta (mediana)</div><div class="kpi-value" id="kResp">–</div><div class="kpi-sub">horas úteis · consultor → 1ª resposta do BKO</div><div class="delta" id="dResp"></div></div>
       <div class="kpi warn"><div class="kpi-label">Transferidos</div><div class="kpi-value" id="kTransf">–</div><div class="kpi-sub" id="kTransfSub"></div><div class="delta" id="dTransf"></div></div>
     </div>
 
     <div class="secao" id="secAgora">Agora · tickets aguardando o BackOffice</div>
     <div class="kpis">
-      <div class="kpi warn"><div class="kpi-label">Aguardando BO</div><div class="kpi-value" id="kBO">–</div><div class="kpi-sub">vez do BackOffice responder</div><div class="delta neutro" id="cBO"></div></div>
+      <div class="kpi warn"><div class="kpi-label">Aguardando BKO</div><div class="kpi-value" id="kBO">–</div><div class="kpi-sub">vez do BackOffice responder</div><div class="delta neutro" id="cBO"></div></div>
       <div class="kpi ok"><div class="kpi-label">Em dia</div><div class="kpi-value" id="kDia">–</div><div class="kpi-sub">dentro de 1 dia útil</div><div class="delta neutro" id="cDia"></div></div>
       <div class="kpi bad"><div class="kpi-label">Atraso · sem resposta</div><div class="kpi-value" id="kAtrResp">–</div><div class="kpi-sub">consultor sem retorno há mais de 1 dia útil</div><div class="delta neutro" id="cAtrResp"></div></div>
       <div class="kpi bad"><div class="kpi-label">Atraso · transferência</div><div class="kpi-value" id="kAtrTransf">–</div><div class="kpi-sub">sem retorno após a transferência</div><div class="delta neutro" id="cAtrTransf"></div></div>
@@ -171,7 +171,7 @@
 
     <div class="card" style="margin-bottom:12px">
       <h3>Atrasos agora</h3>
-      <div class="card-sub">10 tickets esperando o BO há mais tempo · SLA de 1 dia útil</div>
+      <div class="card-sub">10 tickets esperando o BKO há mais tempo · SLA de 1 dia útil</div>
       <div id="listaAtrasos"></div>
     </div>
 
@@ -376,9 +376,9 @@ function render(){
   variacao($('dTransf'), r.transf, a && a.transf, 'pct', 'desce', rot);
   const atr = r.agora.atrResp + r.agora.atrTransf, bo = r.agora.bo;
   $('cBO').textContent = `${fmt(atr)} em atraso (${pct(atr, bo)})`;
-  $('cDia').textContent = `${pct(r.agora.emDia, bo)} dos aguardando BO`;
-  $('cAtrResp').textContent = `${pct(r.agora.atrResp, bo)} dos aguardando BO`;
-  $('cAtrTransf').textContent = `${pct(r.agora.atrTransf, bo)} dos aguardando BO`;
+  $('cDia').textContent = `${pct(r.agora.emDia, bo)} dos aguardando BKO`;
+  $('cAtrResp').textContent = `${pct(r.agora.atrResp, bo)} dos aguardando BKO`;
+  $('cAtrTransf').textContent = `${pct(r.agora.atrTransf, bo)} dos aguardando BKO`;
 
 
 
@@ -404,98 +404,208 @@ function render(){
 // ── Relatório semanal ──────────────────────────────────────────────────────
 let RELATORIO = null;   // { html, texto, resumo, assunto }
 
+const MES_EXT = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+
+/**
+ * Semanas (seg–dom) do mês até `ate`, para comparar a semana do relatório com as outras do mês.
+ * Medidas por dia útil (semanas com feriado ou cortadas pela virada do mês têm tamanhos diferentes).
+ * A semana em andamento conta só os dias completos (até ontem); uma semana sem dia útil junta-se à seguinte.
+ */
+function semanasDoMes(mesDe, ate, lista){
+  const ontem = somaDias(hoje(), -1), out = [];
+  for (let de = mesDe; de <= ate;){
+    const fim = somaDias(segunda(de), 6) < ate ? somaDias(segunda(de), 6) : ate;
+    const conta = fim < hoje() ? fim : (ontem >= de ? ontem : hoje());
+    out.push({ de, ate: conta, rotulo: `${de.slice(8, 10)}–${diaCurto(conta)}` });
+    de = somaDias(fim, 1);
+  }
+  for (let i = out.length - 2; i >= 0; i--){
+    if (!diasDe(out[i].de, out[i].ate).some(diaUtil)){ out[i + 1].de = out[i].de; out[i + 1].rotulo = out[i].rotulo.slice(0, 2) + out[i + 1].rotulo.slice(2); out.splice(i, 1); }
+  }
+  for (const s of out){
+    const L = lista.filter(t => { const d = t[I.AB].slice(0, 10); return d >= s.de && d <= s.ate; });
+    s.du = diasDe(s.de, s.ate).filter(diaUtil).length;
+    s.ab = L.length; s.transf = L.filter(transferido).length;
+    s.abDia = s.du ? s.ab / s.du : null; s.trDia = s.du ? s.transf / s.du : null;
+    s.resp = mediana(L.filter(t => t[I.TRESP] != null).map(t => t[I.TRESP]));
+  }
+  return out;
+}
+
 /**
  * Relatório semanal em HTML para e-mail. Só tabelas e estilos inline (Gmail e Outlook descartam
- * <style>, flexbox e SVG); cores da paleta W1 em tema claro.
+ * <style>, flexbox, SVG e scripts); cores da paleta W1 em tema claro.
+ * Tabela por departamento e assunto: abertos/fechados/1ª resposta/em processo do MÊS da semana,
+ * atrasos de agora (janela de 120 dias). Destaques: a semana comparada com as outras semanas do mês.
  */
 function montarRelatorio(){
-  const r = resumo(), deps = porDepartamento(r.L);
+  const r = resumo();   // números da semana: só para o histórico semanal (registrarSemana)
   const semana = rotuloPeriodo();
-  const ant = intervaloAnterior(), a = ant && numerosDe(doIntervalo(ant.de, ant.ate), ant.corte), rot = ant && ant.rotulo;
-  const C = { marca: '#0b494b', marca2: '#13908f', fundo: '#f4f7f6', borda: '#dbe4e3', linha: '#e4ecea', zebra: '#f7faf9',
-              texto: '#0c2b2b', apagado: '#5a6b6a', bom: '#0b7a5b', ruim: '#c0442e', alerta: '#e8a33d' };
+  const fora = t => DEPTO_FORA.has(deptOf(t));
+  const W = janela().filter(t => !fora(t));
+  const fimMes = periodo.ate < hoje() ? periodo.ate : hoje();
+  const mesDe = fimMes.slice(0, 8) + '01';
+  const rotMes = `${MES_EXT[+fimMes.slice(5, 7) - 1]} (01 a ${diaCurto(fimMes)})`;
+  const M = W.filter(t => { const d = t[I.AB].slice(0, 10); return d >= mesDe && d <= fimMes; });
+  const C = { marca: '#0b494b', marca2: '#13908f', fundo: '#f4f7f6', borda: '#dbe4e3', linha: '#e4ecea',
+              texto: '#0c2b2b', apagado: '#5a6b6a', bom: '#0b7a5b', ruim: '#c0442e', alerta: '#e8a33d', barra: '#cfe3e1' };
   const FONTE = "font-family:'Segoe UI',Arial,Helvetica,sans-serif";
-  const corTom = tom => tom === 'bom' ? C.bom : tom === 'ruim' ? C.ruim : C.apagado;
+  const nz = v => v ? fmt(v) : '–';
+  const verm = v => v ? `<span style="color:${C.ruim};font-weight:bold">${fmt(v)}</span>` : '–';
+  const dec = v => v.toFixed(1).replace('.', ',');
 
-  // Cartão: rótulo, número grande e uma linha de contexto (variação ou proporção)
-  const cartao = (rotulo, valor, contexto, corBarra, corValor, corContexto) => `
-    <td width="25%" valign="top" style="padding:5px">
+  // ── Tabela por departamento e assunto ──
+  const novo = () => ({ ab: 0, fe: 0, proc: 0, ar: 0, at: 0, resp: [] });
+  const grupos = new Map(), tot = novo();
+  const alvos = t => {
+    const d = deptOf(t), a = D.assuntos[t[I.SUBJ]] || '(sem assunto)';
+    if (!grupos.has(d)) grupos.set(d, { d, tot: novo(), subs: new Map() });
+    const g = grupos.get(d); if (!g.subs.has(a)) g.subs.set(a, novo());
+    return [g.tot, g.subs.get(a), tot];
+  };
+  for (const t of M){
+    const b = refBO(t);
+    for (const o of alvos(t)){
+      o.ab++; if (t[I.TRESP] != null) o.resp.push(t[I.TRESP]);
+      if (fechado(t)) o.fe++; else if (!b || !b.atrasado) o.proc++;
+    }
+  }
+  for (const t of W){
+    const b = refBO(t); if (!b || !b.atrasado) continue;
+    for (const o of alvos(t)) b.motivo === 'transferencia' ? o.at++ : o.ar++;
+  }
+  const ordem = (a, b) => (b[1].ar + b[1].at) - (a[1].ar + a[1].at) || b[1].ab - a[1].ab;
+  const td = `padding:5px 6px;border-bottom:1px solid ${C.linha};text-align:right;white-space:nowrap;font-size:11.5px;${FONTE}`;
+  const sep = `;border-left:2px solid ${C.borda}`;
+  const linha = (nome, o, tipo) => {
+    const est = tipo === 'dep' ? `;font-weight:bold;color:${C.marca};background:#eef6f5;border-top:2px solid ${C.borda}`
+      : tipo === 'total' ? `;font-weight:bold;color:${C.texto};background:#eef3f2;border-top:2px solid ${C.marca2}` : `;color:${C.texto}`;
+    const txt = `;text-align:left;white-space:normal` + (tipo === 'sub' ? ';padding-left:24px;font-size:11px' : '');
+    return `<tr><td style="${td}${est}${txt}">${esc(nome)}</td><td style="${td}${est}">${nz(o.ab)}</td><td style="${td}${est}">${nz(o.fe)}</td>
+      <td style="${td}${est}">${o.ab ? pct(o.fe, o.ab) : '–'}</td><td style="${td}${est}">${fmtH(mediana(o.resp))}</td><td style="${td}${est}">${nz(o.proc)}</td>
+      <td style="${td}${est}${sep}">${verm(o.ar)}</td><td style="${td}${est}">${verm(o.at)}</td></tr>`;
+  };
+  const rotAssuntos = `<tr><td colspan="8" style="${FONTE};font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:${C.apagado};padding:4px 6px 2px 14px">Assuntos</td></tr>`;
+  const corpo = [...grupos.values()].map(g => [g.d, g.tot, g]).filter(x => x[1].ab || x[1].ar || x[1].at).sort(ordem)
+    .map(([d, o, g]) => linha(d, o, 'dep') + rotAssuntos
+      + [...g.subs].filter(x => x[1].ab || x[1].ar || x[1].at).sort(ordem).map(([a, so]) => linha(a, so, 'sub')).join('')).join('');
+  const th = `padding:6px 5px;background:#eef3f2;color:${C.apagado};font-size:9.5px;font-weight:bold;text-transform:uppercase;letter-spacing:.03em;text-align:right;vertical-align:bottom;border-bottom:1px solid ${C.borda};${FONTE}`;
+  const thG = `padding:6px 5px;background:#e3eeec;color:${C.marca};font-size:9.5px;font-weight:bold;text-transform:uppercase;letter-spacing:.03em;text-align:center;${FONTE}`;
+  const tabela = `<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;background:#ffffff;border:1px solid ${C.borda}">
+    <thead><tr><th rowspan="2" style="${th};text-align:left">Departamento / assunto</th><th colspan="5" style="${thG}">Abertos em ${rotMes}</th>
+      <th colspan="2" style="${thG}${sep}">Em atraso hoje · abertos nos últimos ${JANELA_DIAS} dias</th></tr>
+    <tr><th style="${th}">Abertos</th><th style="${th}">Fechados</th><th style="${th}">% fech.</th><th style="${th}">1ª resposta</th><th style="${th}">Em processo</th>
+      <th style="${th}${sep}">Sem resposta</th><th style="${th}">Após transferência</th></tr></thead>
+    <tbody>${corpo}${linha('Total', tot, 'total')}</tbody></table>`;
+
+  // ── Destaques: a semana contra as outras semanas do mês ──
+  const fimSemana = periodo.ate < hoje() ? periodo.ate : hoje();
+  const S = semanasDoMes(mesDe, fimSemana, W);
+  const atual = S[S.length - 1];
+  const ORD = ['', '2ª', '3ª', '4ª', '5ª', '6ª'];
+  const posicao = (chave, maior) => S.filter(s => s[chave] != null).sort((a, b) => maior ? b[chave] - a[chave] : a[chave] - b[chave]).indexOf(atual);
+  const duMes = S.reduce((s, x) => s + x.du, 0);
+  const mediaMes = chave => duMes ? S.reduce((s, x) => s + x[chave], 0) / duMes : null;
+  const respMes = mediana(M.filter(t => t[I.TRESP] != null).map(t => t[I.TRESP]));
+  const seta = v => v > 0 ? '▲' : '▼';
+  const varPct = (v, ref) => ref ? (v - ref) / ref * 100 : null;
+
+  const barras = (chave, fmtv) => {
+    const mx = Math.max(...S.map(s => s[chave] || 0)) || 1;
+    return `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:8px"><tr>${S.map(s => {
+      const eu = s === atual, h = Math.max(2, Math.round((s[chave] || 0) / mx * 36));
+      return `<td valign="bottom" align="center" style="padding:0 3px;${FONTE};font-size:10px;color:${eu ? C.marca : C.apagado}${eu ? ';font-weight:bold' : ''}">${s[chave] == null ? '–' : fmtv(s[chave])}
+        <div style="height:${h}px;background:${eu ? C.marca2 : C.barra};border-radius:3px 3px 0 0;margin-top:2px;font-size:0;line-height:0">&nbsp;</div>
+        <div style="margin-top:3px;font-size:9.5px">${s.rotulo}</div></td>`; }).join('')}</tr></table>`;
+  };
+  const caixa = (rotulo, valor, sub, grafico, texto, corBarra) => `
+    <td width="50%" valign="top" style="padding:5px">
       <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;background:#ffffff;border:1px solid ${C.borda};border-left:4px solid ${corBarra};border-radius:8px">
         <tr><td style="padding:10px 12px;${FONTE}">
           <div style="font-size:10px;font-weight:bold;letter-spacing:.06em;text-transform:uppercase;color:${C.apagado}">${rotulo}</div>
-          <div style="font-size:24px;font-weight:bold;line-height:1.25;color:${corValor || C.marca}">${valor}</div>
-          <div style="font-size:11px;color:${corContexto || C.apagado}">${contexto}</div>
+          <div style="font-size:24px;font-weight:bold;line-height:1.25;color:${C.marca}">${valor}</div>
+          <div style="font-size:11px;color:${C.apagado}">${sub}</div>${grafico}
+          <div style="font-size:12px;line-height:1.45;color:${C.texto};margin-top:8px;padding-top:8px;border-top:1px dashed ${C.borda}">${texto}</div>
         </td></tr>
       </table>
     </td>`;
-  const linhaCartoes = celulas => `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr>${celulas.join('')}</tr></table>`;
-  const vAb = infoVariacao(r.abertos, a && a.abertos, 'pct', null, rot);
-  const vFe = infoVariacao(r.pctFech, a && a.pctFech, 'pp', 'sobe', rot);
-  const vRe = infoVariacao(r.resp, a && a.resp, 'pct', 'desce', rot);
-  const vTr = infoVariacao(r.transf, a && a.transf, 'pct', 'desce', rot);
-  const bo = r.agora.bo, atr = r.agora.atrResp + r.agora.atrTransf;
-  const semana4 = linhaCartoes([
-    cartao('Abertos', fmt(r.abertos), vAb.texto, C.marca2, null, corTom(vAb.tom)),
-    cartao('Fechados', `${fmt(r.fechados)} <span style="font-size:13px;color:${C.apagado}">(${pct(r.fechados, r.abertos)})</span>`, vFe.texto, C.bom, null, corTom(vFe.tom)),
-    cartao('1ª resposta · mediana', fmtH(r.resp), vRe.texto, C.marca2, null, corTom(vRe.tom)),
-    cartao('Transferidos', fmt(r.transf), vTr.texto, C.alerta, null, corTom(vTr.tom)),
-  ]);
-  const agora4 = linhaCartoes([
-    cartao('Aguardando BO', fmt(bo), `${fmt(atr)} em atraso (${pct(atr, bo)})`, C.alerta),
-    cartao('Em dia', fmt(r.agora.emDia), `${pct(r.agora.emDia, bo)} dos aguardando BO`, C.bom),
-    cartao('Atraso · sem resposta', fmt(r.agora.atrResp), `${pct(r.agora.atrResp, bo)} dos aguardando BO`, C.ruim, C.ruim),
-    cartao('Atraso · transferência', fmt(r.agora.atrTransf), `${pct(r.agora.atrTransf, bo)} dos aguardando BO`, C.ruim, C.ruim),
-  ]);
+  const semDias = `${diaCurto(atual.de)} a ${diaCurto(atual.ate)}`;
+  const naoDa = 'Sem dia útil completo na semana ainda.';
+
+  const entMes = mediaMes('ab'), pEnt = posicao('abDia', true), maiorEnt = S.filter(s => s.abDia != null).sort((a, b) => b.abDia - a.abDia)[0];
+  const vEnt = atual.abDia == null ? null : varPct(atual.abDia, entMes);
+  const txtEnt = vEnt == null ? naoDa : (S.length < 2 ? '' : pEnt === 0 ? '<b>Maior entrada do mês.</b> '
+      : `<b>${ORD[pEnt]} maior entrada do mês</b> (a maior foi ${maiorEnt.rotulo}, com ${fmt(Math.round(maiorEnt.abDia))}/dia). `)
+    + `${seta(vEnt)} ${dec(Math.abs(vEnt))}% vs a média do mês (${fmt(Math.round(entMes))}/dia útil).`;
+
+  const pResp = posicao('resp', false), rapida = S.filter(s => s.resp != null).sort((a, b) => a.resp - b.resp)[0];
+  const vResp = atual.resp == null ? null : varPct(atual.resp, respMes);
+  const txtResp = vResp == null ? 'Sem respostas na semana ainda.'
+    : `${seta(vResp)} ${dec(Math.abs(vResp))}% vs a mediana do mês (${fmtH(respMes)}). `
+      + (S.length < 2 ? '' : pResp === 0 ? '<b>Semana mais rápida do mês.</b>' : `<b>${ORD[pResp]} mais rápida</b> do mês (a mais rápida foi ${rapida.rotulo}, com ${fmtH(rapida.resp)}).`);
+
+  const trMes = mediaMes('transf'), pTr = posicao('trDia', false);
+  const vTr = atual.trDia == null ? null : varPct(atual.trDia, trMes);
+  const txtTr = vTr == null ? naoDa : `${seta(vTr)} ${dec(Math.abs(vTr))}% vs a média do mês (${dec(trMes)}/dia útil). `
+    + (S.length < 2 ? '' : pTr === 0 ? '<b>Menor do mês.</b>' : `${ORD[pTr]} menor do mês.`);
+
+  const atr = W.filter(t => alerta(t)), bko = W.filter(aguardandoBO).length;
+  const atrResp = atr.filter(t => refBO(t).motivo !== 'transferencia').length, atrTransf = atr.length - atrResp;
+  const atrSemana = atr.filter(t => t[I.AB].slice(0, 10) >= periodo.de && t[I.AB].slice(0, 10) <= periodo.ate).length;
+  const atrAntes = atr.filter(t => t[I.AB].slice(0, 10) < mesDe).length;
+  const antigo = atr.reduce((m, t) => !m || refBO(t).ref < refBO(m).ref ? t : m, null);
+  const porDep = {}; atr.forEach(t => { porDep[deptOf(t)] = (porDep[deptOf(t)] || 0) + 1; });
+  const top = Object.entries(porDep).sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const txtAtr = !atr.length ? 'Nenhum ticket em atraso agora.'
+    : `${fmt(atrResp)} sem resposta + ${fmt(atrTransf)} após transferência. <b>${fmt(atrSemana)}</b> são de tickets abertos nesta semana; ${fmt(atrAntes)} vêm de antes de ${MES_EXT[+mesDe.slice(5, 7) - 1]}. `
+      + `Mais antigo: <b>${Math.floor(horasEntre(refBO(antigo).ref, D.geradoEm) / 24)} dias</b> parado (${esc(deptOf(antigo))}, #${antigo[I.TID]}). `
+      + `Mais atrasos: ${top.map(([d, n]) => `${esc(d)} (${n})`).join(', ')}.`;
+
+  const destaques = `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">
+    <tr>${caixa('Entrada de tickets', atual.abDia == null ? '–' : `${fmt(Math.round(atual.abDia))}<span style="font-size:12px;font-weight:normal;color:${C.apagado}"> /dia útil</span>`,
+          `${fmt(atual.ab)} abertos de ${semDias}`, barras('abDia', v => fmt(Math.round(v))), txtEnt, C.marca2)}
+        ${caixa('1ª resposta · mediana', fmtH(atual.resp), `tickets abertos de ${semDias}`, barras('resp', fmtH), txtResp, C.marca2)}</tr>
+    <tr>${caixa('Transferidos', atual.trDia == null ? '–' : `${dec(atual.trDia)}<span style="font-size:12px;font-weight:normal;color:${C.apagado}"> /dia útil</span>`,
+          `${fmt(atual.transf)} tickets da semana mudaram de assunto`, barras('trDia', dec), txtTr, C.alerta)}
+        ${caixa('Em atraso agora', `<span style="color:${C.ruim}">${fmt(atr.length)}</span>`, `de ${fmt(bko)} tickets aguardando o BKO (${pct(atr.length, bko)})`, '', txtAtr, C.ruim)}</tr>
+  </table>`;
 
   const titulo = t => `<div style="${FONTE};font-size:12px;font-weight:bold;letter-spacing:.06em;text-transform:uppercase;color:${C.marca};margin:22px 5px 8px;padding-bottom:5px;border-bottom:2px solid ${C.marca2}">${t}</div>`;
-  const sub = t => `<div style="${FONTE};font-size:11px;color:${C.apagado};margin:-4px 5px 8px">${t}</div>`;
-
-  // Tabelas (mesmo estilo nas duas)
-  const est = {
-    table: `width:100%;border-collapse:collapse;${FONTE};font-size:12px;background:#ffffff;border:1px solid ${C.borda}`,
-    th: `padding:6px 5px;background:#eef3f2;color:${C.apagado};font-size:9.5px;font-weight:bold;text-transform:uppercase;letter-spacing:.03em;text-align:center;border-bottom:1px solid ${C.borda}`,
-    td: `padding:5px 6px;border-bottom:1px solid ${C.linha};text-align:right;white-space:nowrap;font-size:11.5px`,
-    total: `;font-weight:bold;border-top:2px solid ${C.marca2};background:#eef3f2`,
-    cor: C.texto, corAtraso: C.ruim, zebra: C.zebra, quebraTexto: true,
-  };
-  const nz = v => v ? fmt(v) : '–';
-  const verm = v => v ? `<span style="color:${C.ruim};font-weight:bold">${fmt(v)}</span>` : '–';
-  const tabDep = document.createElement('table');
-  tabDep.innerHTML = `<thead><tr>${['Departamento', 'Abertos', 'Fechados', '% fech.', '1ª resposta', 'Em dia', 'Atraso · sem resp.', 'Atraso · transf.', 'Últ. transf.'].map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>`
-    + deps.map(x => `<tr><td class="txt">${esc(x.d)}</td><td>${nz(x.ab)}</td><td>${nz(x.fe)}</td><td>${x.ab ? pct(x.fe, x.ab) : '–'}</td>
-        <td>${fmtH(mediana(x.resp))}</td><td>${nz(x.dia)}</td><td>${verm(x.ar)}</td><td>${verm(x.at)}</td><td>${x.ult ? fmtDia(x.ult) : '–'}</td></tr>`).join('')
-    + `<tr class="total"><td class="txt">Total</td><td>${fmt(r.abertos)}</td><td>${fmt(r.fechados)}</td><td>${pct(r.fechados, r.abertos)}</td><td>${fmtH(r.resp)}</td>
-        <td>${fmt(r.agora.emDia)}</td><td>${fmt(r.agora.atrResp)}</td><td>${fmt(r.agora.atrTransf)}</td><td></td></tr></tbody>`;
-  // Tabela por assunto no formato do Titan (as mesmas linhas do relatório de atrasos)
-  const tabTitan = document.createElement('table');
-  tabTitan.innerHTML = tabelaTitan(montarLinhas(null, janela()));
-
+  const sub = t => `<div style="${FONTE};font-size:11.5px;color:${C.apagado};margin:-4px 5px 10px;line-height:1.45">${t}</div>`;
   const botao = (txt, url, cheio) => url ? `<a href="${esc(url)}" style="display:inline-block;${FONTE};font-size:13px;font-weight:bold;text-decoration:none;padding:9px 16px;border-radius:7px;margin:0 6px 6px 0;${cheio
     ? `background:${C.marca};color:#ffffff;border:1px solid ${C.marca}` : `background:#ffffff;color:${C.marca};border:1px solid ${C.marca}`}">${txt}</a>` : '';
+  const leg = (nome, txt) => `<b style="color:${C.texto}">${nome}:</b> ${txt}`;
+  const comoLer = [
+    leg('Abertos / Fechados', `tickets abertos no mês (pela data de abertura) e quantos deles já estão fechados.`),
+    leg('1ª resposta', 'mediana do tempo até a 1ª mensagem do BKO, contando só dias úteis (24h por dia útil). Metade dos tickets foi respondida em até esse tempo; tickets sem resposta não entram.'),
+    leg('Em processo', 'tickets do mês não fechados e sem atraso: vez do BKO dentro do prazo, ou aguardando o consultor.'),
+    leg('Em atraso hoje', `tudo que está atrasado agora, de tickets abertos nos últimos ${JANELA_DIAS} dias (inclusive de meses anteriores), por isso a linha não soma com os abertos do mês. Sem resposta: o consultor escreveu e o BKO não respondeu em 1 dia útil. Após transferência: a área que recebeu a transferência não respondeu em 1 dia útil.`),
+    leg('Destaques', 'a semana comparada com as outras semanas do mês, por dia útil (semanas com feriado ou cortadas pela virada do mês têm tamanhos diferentes). A semana em andamento conta só os dias completos.'),
+  ].join('<br>');
 
   const html = `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:${C.fundo}"><tr><td align="center" style="padding:18px 8px">
-  <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;width:100%;max-width:760px;background:#ffffff;border:1px solid ${C.borda};border-radius:12px;overflow:hidden">
+  <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;width:100%;max-width:820px;background:#ffffff;border:1px solid ${C.borda};border-radius:12px;overflow:hidden">
     <tr><td bgcolor="${C.marca}" style="background:${C.marca};padding:18px 22px;${FONTE}">
       <div style="font-size:11px;font-weight:bold;letter-spacing:.1em;text-transform:uppercase;color:#9fd8d6">W1 · BackOffice</div>
       <div style="font-size:21px;font-weight:bold;color:#ffffff;margin-top:2px">Relatório semanal de tickets</div>
-      <div style="font-size:13px;color:#d7eeed;margin-top:4px">Semana de ${semana} · dados de ${fmtData(D.geradoEm).replace(' ', ' às ')}</div>
+      <div style="font-size:13px;color:#d7eeed;margin-top:4px">Semana de ${semana} · mês de ${rotMes} · dados de ${fmtData(D.geradoEm).replace(' ', ' às ')}</div>
     </td></tr>
     <tr><td style="padding:6px 17px 20px">
-      ${titulo('Na semana')}${sub(`tickets abertos de ${semana}${rot ? ` · comparação: ${rot}` : ''}`)}${semana4}
-      ${titulo('Agora')}${sub(`tickets abertos desde ${fmtDia(inicioJanela())} que aguardam o BackOffice · SLA de 1 dia útil`)}${agora4}
-      ${titulo('Por departamento')}<div style="padding:0 5px">${tabelaParaEmail(tabDep, est)}</div>
-      ${titulo('Situação por assunto')}${sub('em processo pelo mês de abertura · em dia e atrasos de agora')}<div style="padding:0 5px">${tabelaParaEmail(tabTitan, est)}</div>
+      ${titulo('Por departamento e assunto')}${sub(`<b>Abertos, fechados, 1ª resposta e em processo:</b> tickets abertos em ${rotMes}. <b>Em atraso hoje:</b> tudo que está atrasado neste momento, de tickets abertos nos últimos ${JANELA_DIAS} dias (desde ${fmtDia(inicioJanela())}), inclusive de meses anteriores.`)}
+      <div style="padding:0 5px">${tabela}</div>
+      ${titulo('Destaques da semana')}${sub(`Semana de ${semDias} comparada com as outras semanas de ${MES_EXT[+mesDe.slice(5, 7) - 1]}`)}${destaques}
       <div style="padding:20px 5px 0">${botao('Abrir o painel', URL_PAINEL, true)}${botao('Ver painel completo', URL_COMPLETO, false)}</div>
-      <div style="${FONTE};font-size:11px;color:${C.apagado};padding:10px 5px 0;line-height:1.5">
-        SLA de 1 dia útil: vence no mesmo horário do próximo dia útil (fins de semana e feriados nacionais não contam).
-        Tempo de resposta em horas úteis, da mensagem do consultor à 1ª resposta do BO. Fonte: Metabase.
+      <div style="${FONTE};font-size:11px;color:${C.apagado};padding:10px 5px 0;line-height:1.55">
+        <b style="color:${C.marca}">Como ler</b><br>${comoLer}<br>
+        SLA de 1 dia útil: vence no mesmo horário do próximo dia útil (fins de semana e feriados nacionais não contam). Fonte: Metabase.
       </div>
     </td></tr>
   </table>
   </td></tr></table>`;
+  const totAtr = atrResp + atrTransf;
   const texto = [`Relatório semanal de tickets · BackOffice — semana de ${semana}`,
-    `Abertos: ${fmt(r.abertos)} · Fechados: ${fmt(r.fechados)} (${pct(r.fechados, r.abertos)}) · 1ª resposta (mediana): ${fmtH(r.resp)} · Transferidos: ${fmt(r.transf)}`,
-    `Agora: ${fmt(bo)} aguardando BO · ${fmt(r.agora.emDia)} em dia · ${fmt(r.agora.atrResp)} atraso sem resposta · ${fmt(r.agora.atrTransf)} atraso por transferência`,
+    `Mês (${rotMes}): ${fmt(tot.ab)} abertos · ${fmt(tot.fe)} fechados (${pct(tot.fe, tot.ab)}) · ${fmt(tot.proc)} em processo · 1ª resposta (mediana): ${fmtH(respMes)}`,
+    `Em atraso hoje: ${fmt(totAtr)} (${fmt(atrResp)} sem resposta · ${fmt(atrTransf)} após transferência)`,
     URL_PAINEL ? `Painel: ${URL_PAINEL}` : '', URL_COMPLETO ? `Painel completo: ${URL_COMPLETO}` : ''].filter(Boolean).join(String.fromCharCode(10));
   return {
     html, texto, assunto: CONFIG.assunto.replace('{semana}', semana),
